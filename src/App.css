@@ -1511,3 +1511,143 @@ a {
   }
 }
 
+
+/* =========================================================
+   FINAL LEAD TABLE CARD FIX
+   Evita que las letras se monten una encima de otra.
+   Convierte cada lead en una tarjeta compacta y profesional.
+   ========================================================= */
+
+#businesses .table {
+  gap: 12px;
+  overflow: visible;
+}
+
+#businesses .table-head {
+  display: none;
+}
+
+#businesses .lead-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "business status"
+    "quality website"
+    "email email"
+    "rating score";
+  gap: 10px 12px;
+  align-items: center;
+  width: 100%;
+  min-height: auto;
+  padding: 16px;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+#businesses .lead-row > span {
+  min-width: 0;
+  width: 100%;
+}
+
+#businesses .lead-row > span:nth-child(1) {
+  grid-area: business;
+}
+
+#businesses .lead-row > span:nth-child(2) {
+  grid-area: quality;
+}
+
+#businesses .lead-row > span:nth-child(3) {
+  grid-area: website;
+  justify-self: end;
+  width: auto;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--text-soft);
+  background: var(--surface-inset);
+  border: 1px solid var(--inset-border);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+}
+
+#businesses .lead-row > span:nth-child(4) {
+  grid-area: email;
+}
+
+#businesses .lead-row > span:nth-child(5) {
+  grid-area: rating;
+  justify-self: start;
+  text-align: left;
+  width: auto;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+#businesses .lead-row > span:nth-child(6) {
+  grid-area: score;
+  justify-self: end;
+  text-align: right;
+  width: auto;
+  font-size: 14px;
+}
+
+#businesses .lead-row > span:nth-child(7) {
+  grid-area: status;
+  justify-self: end;
+  width: auto;
+}
+
+#businesses .quality-badge {
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+#businesses .email-found,
+#businesses .email-missing {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 14px;
+  padding: 9px 11px;
+  background: var(--surface-inset);
+  border: 1px solid var(--inset-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#businesses .lead-row strong {
+  font-size: 14px;
+}
+
+#businesses .lead-row small {
+  font-size: 12px;
+}
+
+/* En pantallas muy estrechas, todo baja en una sola columna */
+@media (max-width: 680px) {
+  #businesses .lead-row {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "business"
+      "quality"
+      "website"
+      "email"
+      "rating"
+      "score"
+      "status";
+  }
+
+  #businesses .lead-row > span:nth-child(3),
+  #businesses .lead-row > span:nth-child(5),
+  #businesses .lead-row > span:nth-child(6),
+  #businesses .lead-row > span:nth-child(7) {
+    justify-self: start;
+    text-align: left;
+  }
+}
+
