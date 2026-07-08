@@ -487,25 +487,16 @@ a {
 
 .main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
-  gap: 28px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.85fr);
+  gap: 26px;
   align-items: start;
 }
 
-.left-panel {
-  min-width: 0;
-  display: grid;
-  gap: 22px;
-  align-content: start;
-}
-
-/* El panel derecho ahora fluye en cuadrícula para llenar el ancho */
+.left-panel,
 .right-panel {
   min-width: 0;
   display: grid;
-  grid-template-columns: 1fr;
   gap: 22px;
-  align-content: start;
 }
 
 .card {
@@ -1121,28 +1112,120 @@ a {
 }
 
 /* =========================================================
-   LEAD NOTES & FOLLOW-UP  (tarjetas nuevas)
+   OUTREACH SEQUENCE
    ========================================================= */
+
+.outreach-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+  margin-top: 16px;
+}
+
+.outreach-grid button {
+  min-height: 44px;
+  width: 100%;
+}
+
+.outreach-preview {
+  margin-top: 16px;
+  border-radius: var(--radius-md);
+  padding: 16px;
+  background: var(--surface-inset);
+  border: 1px solid var(--inset-border);
+}
+
+.outreach-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.outreach-preview-header strong {
+  color: var(--text-strong);
+  font-size: 15px;
+}
+
+.outreach-preview-header span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: var(--hot-bg);
+  border: 1px solid var(--hot-border);
+  color: var(--hot-text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.outreach-preview p {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  color: var(--text-soft);
+  line-height: 1.58;
+  font-size: 14px;
+}
+
+.outreach-preview .actions {
+  margin-top: 14px;
+}
+
+@media (max-width: 680px) {
+  .outreach-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .outreach-preview-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+
+/* =========================================================
+   LEAD NOTES + FOLLOW-UP
+   ========================================================= */
+
+.followup-inline {
+  margin-top: 5px;
+  font-weight: 700;
+}
+
+.followup-inline.overdue {
+  color: var(--danger);
+}
+
+.followup-inline.due-today {
+  color: var(--hot-text);
+}
+
+.followup-inline.scheduled {
+  color: var(--green);
+}
 
 .followup-summary {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  margin: 4px 0 18px;
+  margin-top: 16px;
 }
 
-.followup-summary > div {
+.followup-summary div {
   border-radius: var(--radius-sm);
   padding: 14px;
   background: var(--surface-inset);
   border: 1px solid var(--inset-border);
-  display: grid;
-  gap: 6px;
 }
 
 .followup-summary strong {
+  display: block;
   color: var(--text-strong);
   font-size: 13px;
+  margin-bottom: 6px;
 }
 
 .followup-summary span {
@@ -1153,42 +1236,11 @@ a {
 
 .followup-controls {
   display: grid;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 11px;
+  margin-top: 16px;
 }
 
-.followup-controls label {
-  display: grid;
-  gap: 8px;
-  color: var(--text-soft);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.followup-controls input[type="date"] {
-  width: 100%;
-  min-height: 48px;
-  border-radius: var(--radius-sm);
-  padding: 0 15px;
-  color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid var(--card-border-strong);
-  outline: none;
-  font-weight: 600;
-  font-family: inherit;
-}
-
-.followup-controls input[type="date"]:focus {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 4px rgba(79, 99, 255, 0.14);
-}
-
-.notes-box {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
+.followup-controls label,
 .notes-box label {
   display: grid;
   gap: 8px;
@@ -1197,22 +1249,35 @@ a {
   font-weight: 600;
 }
 
+.followup-controls input,
 .notes-box textarea {
   width: 100%;
   border-radius: var(--radius-sm);
-  padding: 14px 15px;
+  padding: 13px 15px;
   color: var(--text);
   background: var(--surface-2);
   border: 1px solid var(--card-border-strong);
   outline: none;
-  font-weight: 500;
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1.5;
-  resize: vertical;
-  min-height: 90px;
+  font-weight: 600;
 }
 
+.followup-controls input {
+  min-height: 48px;
+}
+
+.notes-box {
+  display: grid;
+  gap: 11px;
+  margin-top: 16px;
+}
+
+.notes-box textarea {
+  min-height: 110px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.followup-controls input:focus,
 .notes-box textarea:focus {
   border-color: var(--blue);
   box-shadow: 0 0 0 4px rgba(79, 99, 255, 0.14);
@@ -1220,75 +1285,229 @@ a {
 
 .notes-list {
   display: grid;
-  gap: 12px;
+  gap: 11px;
+  margin-top: 16px;
 }
 
 .note-item {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
   gap: 12px;
-  border-radius: var(--radius-md);
+  align-items: flex-start;
+  border-radius: var(--radius-sm);
   padding: 14px;
   background: var(--surface-inset);
   border: 1px solid var(--inset-border);
 }
 
 .note-item strong {
+  display: block;
   color: var(--text-strong);
   font-size: 12px;
+  margin-bottom: 6px;
 }
 
 .note-item p {
-  margin: 5px 0 0;
+  margin: 0;
   color: var(--text-soft);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
 .note-item button {
-  flex-shrink: 0;
   border: 1px solid var(--card-border-strong);
+  border-radius: 999px;
   background: var(--surface-2);
-  color: var(--danger);
-  border-radius: 10px;
-  padding: 7px 12px;
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
+  padding: 7px 10px;
 }
 
 .note-item button:hover {
+  color: var(--danger);
   border-color: var(--danger);
 }
 
-/* Follow-up inline badge en la tabla de leads */
-.followup-inline {
-  display: block;
-  margin-top: 5px;
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 6px;
-  padding: 3px 7px;
-  width: fit-content;
+@media (max-width: 680px) {
+  .followup-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .note-item {
+    flex-direction: column;
+  }
 }
 
-.followup-inline.overdue {
-  color: #b91c1c;
-  background: rgba(239, 68, 68, 0.14);
-}
-
-.followup-inline.due-today {
-  color: #b45309;
-  background: rgba(245, 158, 11, 0.16);
-}
-
-.followup-inline.scheduled {
-  color: var(--good-text);
-  background: var(--good-bg);
-}
 
 /* =========================================================
-   LAYOUT DEL PANEL DERECHO — una sola columna limpia
-   (sin amontonamiento)
+   FINAL PREMIUM WIDE CRM LAYOUT
+   Hace que la columna derecha use más espacio del centro.
+   Pega este archivo completo en src/App.css.
    ========================================================= */
+
+/* Más ancho general para que el CRM respire mejor */
+.content {
+  max-width: 1760px;
+  padding: 30px 34px 60px;
+}
+
+/* La columna izquierda queda más compacta y la derecha crece */
+.main-grid {
+  grid-template-columns: minmax(520px, 0.78fr) minmax(0, 1.22fr);
+  gap: 26px;
+  align-items: start;
+}
+
+/* La columna derecha ahora aprovecha el ancho disponible */
+.right-panel {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  align-items: start;
+}
+
+/* El audit y el mensaje principal se ven mejor ocupando todo el ancho */
+.right-panel #audits,
+.right-panel #messages {
+  grid-column: 1 / -1;
+}
+
+/* Contact actions, pipeline, follow-up y management pueden compartir filas */
+.right-panel .card {
+  width: 100%;
+}
+
+/* La tarjeta del audit se vuelve más horizontal y premium */
+#audits .audit-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#audits .audit-list li {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Botones del audit en 2 columnas para no verse tan largos */
+#audits .audit-buttons {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#audits .audit-buttons .full {
+  width: 100%;
+}
+
+/* El score queda más compacto dentro del audit ancho */
+#audits .score-circle {
+  width: 132px;
+  height: 132px;
+  font-size: 30px;
+}
+
+/* El mensaje generado aprovecha mejor el espacio */
+#messages .message-box {
+  max-height: 430px;
+  overflow-y: auto;
+}
+
+/* Pipeline más moderno cuando está en una tarjeta más ancha */
+.pipeline-buttons {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Follow-up se ve más limpio */
+.followup-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Activity log no deja tanto espacio visual */
+.log-list {
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* En pantallas medianas seguimos usando 2 columnas, pero más balanceado */
+@media (max-width: 1500px) {
+  .content {
+    padding: 28px 30px 56px;
+  }
+
+  .main-grid {
+    grid-template-columns: minmax(500px, 0.82fr) minmax(0, 1.18fr);
+    gap: 24px;
+  }
+
+  .right-panel {
+    gap: 20px;
+  }
+}
+
+/* Cuando ya no cabe cómodo, bajamos todo a una columna limpia */
+@media (max-width: 1280px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .right-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile/tablet: todo en una sola columna */
+@media (max-width: 900px) {
+  .content {
+    padding: 22px;
+  }
+
+  .right-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .right-panel #audits,
+  .right-panel #messages {
+    grid-column: auto;
+  }
+
+  #audits .audit-list,
+  #audits .audit-buttons,
+  .followup-summary,
+  .pipeline-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* =========================================================
+   PRIVATE BACKUP TOOLS
+   ========================================================= */
+
+.hidden-file-input {
+  display: none;
+}
+
+.private-tools-card {
+  border-color: rgba(79, 99, 255, 0.20);
+  background:
+    linear-gradient(135deg, rgba(79, 99, 255, 0.08), transparent 42%),
+    var(--surface);
+}
+
+.private-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+  margin-top: 16px;
+}
+
+@media (max-width: 680px) {
+  .private-tools-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

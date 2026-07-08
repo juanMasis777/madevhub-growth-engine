@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
 import {
   LayoutDashboard,
@@ -198,6 +198,7 @@ function getLeadQuality(lead) {
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
+  const backupFileInputRef = useRef(null);
 
   const [leads, setLeads] = useState(() =>
     loadFromLocalStorage(STORAGE_KEYS.leads, INITIAL_LEADS)
@@ -1019,6 +1020,109 @@ export default function App() {
       setIsEnriching(false);
     }
   };
+
+  const exportPrivateBackup = () => {
+    const backupData = {
+      app: "MADEVHUB Growth Engine",
+      type: "private-crm-backup",
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      leads,
+      activityLog,
+    };
+
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+
+    const dateLabel = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+
+    downloadLink.href = url;
+    downloadLink.download = `madevhub-private-backup-${dateLabel}.json`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(url);
+
+    addActivityLog(
+      "Private Backup",
+      `Backup exported with ${leads.length} leads`,
+      "backup"
+    );
+  };
+
+  const triggerImportBackup = () => {
+    backupFileInputRef.current?.click();
+  };
+
+  const importPrivateBackup = (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    const confirmImport = window.confirm(
+      "This will replace your current leads and activity log with the backup file. Continue?"
+    );
+
+    if (!confirmImport) {
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      try {
+        const parsedBackup = JSON.parse(reader.result);
+
+        if (
+          parsedBackup?.type !== "private-crm-backup" ||
+          !Array.isArray(parsedBackup.leads) ||
+          !Array.isArray(parsedBackup.activityLog)
+        ) {
+          alert("Invalid MADEVHUB backup file.");
+          return;
+        }
+
+        const importedLeads = parsedBackup.leads;
+        const importedActivityLog = parsedBackup.activityLog;
+
+        setLeads(importedLeads);
+        setActivityLog(importedActivityLog);
+
+        const firstLead = importedLeads[0] || null;
+
+        setSelectedLead(firstLead);
+        setContactMode(getDefaultContactMode(firstLead));
+        setGeneratedAudit("");
+        setOutreachTitle("");
+        setOutreachMessage("");
+        setLeadNoteText("");
+        setFollowUpDate(firstLead?.followUpDate || "");
+        setHotLeadsOnly(false);
+        resetLeadForm();
+
+        addActivityLog(
+          "Private Backup",
+          `Backup imported with ${importedLeads.length} leads`,
+          "backup"
+        );
+
+        alert(`Backup imported. ${importedLeads.length} leads restored.`);
+      } catch (error) {
+        console.error("Import backup error:", error);
+        alert("Could not import this backup file.");
+      } finally {
+        event.target.value = "";
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
 
   const clearSavedData = () => {
     const confirmClear = window.confirm(
@@ -1842,6 +1946,22 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
               Export CSV
             </button>
 
+            <button className="secondary-btn" onClick={exportPrivateBackup}>
+              Export Backup
+            </button>
+
+            <button className="secondary-btn" onClick={triggerImportBackup}>
+              Import Backup
+            </button>
+
+            <input
+              ref={backupFileInputRef}
+              className="hidden-file-input"
+              type="file"
+              accept="application/json,.json"
+              onChange={importPrivateBackup}
+            />
+
             <button className="secondary-btn" onClick={clearSavedData}>
               Reset Data
             </button>
@@ -2106,6 +2226,24 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                 <span>
                   Hot Leads are the best prospects to contact first.
                 </span>
+              </div>
+            </div>
+
+            <div className="card private-tools-card">
+              <h3>Private Data Backup</h3>
+              <p className="muted">
+                Export a full JSON backup to save your leads, notes, follow-ups,
+                proposal status, and activity log outside the browser.
+              </p>
+
+              <div className="private-tools-grid">
+                <button className="secondary-btn" onClick={exportPrivateBackup}>
+                  Export Full Backup
+                </button>
+
+                <button className="secondary-btn" onClick={triggerImportBackup}>
+                  Import Backup
+                </button>
               </div>
             </div>
 
