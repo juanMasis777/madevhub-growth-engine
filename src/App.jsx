@@ -2973,7 +2973,7 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
         {/* ===================== SETTINGS ===================== */}
         {activeView === "settings" && (
-          <section className="view-grid">
+          <section className="view-grid settings-grid">
             <div className="card">
               <h3>Lead Management</h3>
               <p className="muted">

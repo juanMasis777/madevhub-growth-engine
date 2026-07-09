@@ -2463,3 +2463,25 @@ a {
   border-radius: 999px;
   background: linear-gradient(135deg, var(--blue), var(--blue-2));
 }
+
+/* =========================================================
+   SETTINGS — masonry para que las tarjetas se acomoden sin huecos
+   ========================================================= */
+
+.settings-grid {
+  display: block;
+  column-count: 2;
+  column-gap: 26px;
+}
+
+.settings-grid > .card {
+  break-inside: avoid;
+  margin-bottom: 26px;
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .settings-grid {
+    column-count: 1;
+  }
+}
