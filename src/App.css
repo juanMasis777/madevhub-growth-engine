@@ -1651,3 +1651,470 @@ a {
   }
 }
 
+
+/* =========================================================
+   TODAY ACTION CENTER
+   ========================================================= */
+
+.daily-dashboard {
+  margin-bottom: 24px;
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(79, 99, 255, 0.12), transparent 34%),
+    var(--surface);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-md);
+}
+
+.daily-dashboard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.daily-dashboard-header h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 23px;
+  letter-spacing: -0.03em;
+}
+
+.daily-dashboard-header p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.daily-dashboard-header > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  border-radius: 999px;
+  padding: 0 14px;
+  color: var(--blue-dark);
+  background: rgba(79, 99, 255, 0.12);
+  border: 1px solid rgba(79, 99, 255, 0.22);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.daily-action-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.daily-action-card {
+  min-width: 0;
+  border-radius: var(--radius-md);
+  padding: 15px;
+  background: var(--surface-inset);
+  border: 1px solid var(--inset-border);
+}
+
+.daily-action-card-header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 12px;
+}
+
+.daily-action-card-header > span {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--card-border-strong);
+  font-size: 18px;
+}
+
+.daily-action-card-header strong {
+  display: block;
+  color: var(--text-strong);
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.daily-action-card-header small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.daily-action-list {
+  display: grid;
+  gap: 9px;
+}
+
+.daily-action-list p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.daily-action-list button {
+  width: 100%;
+  border: 1px solid var(--card-border-strong);
+  border-radius: 14px;
+  padding: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.daily-action-list button:hover {
+  transform: translateY(-2px);
+  border-color: var(--blue);
+}
+
+.daily-action-list button strong {
+  display: block;
+  color: var(--text-strong);
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.daily-action-list button small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.daily-action-list button em {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 8px;
+  background: var(--status-bg);
+  color: var(--status-text);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.daily-more {
+  font-weight: 800;
+  color: var(--blue-dark) !important;
+}
+
+@media (max-width: 1500px) {
+  .daily-action-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .daily-dashboard-header {
+    flex-direction: column;
+  }
+
+  .daily-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .daily-action-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* =========================================================
+   FINAL CLEAN CRM LAYOUT
+   Layout limpio: 2 columnas reales, sin tarjetas flotando.
+   Reemplaza visualmente los overrides anteriores.
+   ========================================================= */
+
+.content {
+  width: 100% !important;
+  max-width: 1480px !important;
+  margin: 0 auto !important;
+  padding: 30px 34px 60px !important;
+}
+
+.topbar {
+  align-items: flex-start !important;
+}
+
+.topbar > div:first-child {
+  max-width: 520px !important;
+}
+
+.topbar-actions {
+  justify-content: flex-end !important;
+  flex-wrap: wrap !important;
+}
+
+.stats-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.main-grid {
+  display: grid !important;
+  grid-template-columns: minmax(480px, 0.95fr) minmax(520px, 1.05fr) !important;
+  gap: 26px !important;
+  align-items: start !important;
+}
+
+.left-panel,
+.right-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 22px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.right-panel .card,
+.right-panel #audits,
+.right-panel #messages,
+.right-panel #pipeline,
+.right-panel #settings,
+.right-panel #follow-up {
+  width: 100% !important;
+  grid-column: auto !important;
+}
+
+#audits {
+  padding: 26px !important;
+}
+
+#audits .audit-list {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 11px !important;
+}
+
+#audits .audit-list li {
+  min-height: 62px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+#audits .audit-buttons {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 11px !important;
+}
+
+#audits .audit-buttons button {
+  width: 100% !important;
+}
+
+.audit-report,
+#messages .message-box {
+  max-height: 430px !important;
+  overflow-y: auto !important;
+}
+
+.contact-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.pipeline-buttons {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.followup-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.log-list {
+  max-height: 420px !important;
+  overflow-y: auto !important;
+  padding-right: 4px !important;
+}
+
+#businesses .table {
+  gap: 12px !important;
+  overflow: visible !important;
+}
+
+#businesses .table-head {
+  display: none !important;
+}
+
+#businesses .lead-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "business status"
+    "quality website"
+    "email email"
+    "rating score" !important;
+  gap: 10px 12px !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-height: auto !important;
+  padding: 16px !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+}
+
+#businesses .lead-row > span {
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+#businesses .lead-row > span:nth-child(1) {
+  grid-area: business !important;
+}
+
+#businesses .lead-row > span:nth-child(2) {
+  grid-area: quality !important;
+}
+
+#businesses .lead-row > span:nth-child(3) {
+  grid-area: website !important;
+  justify-self: end !important;
+  width: auto !important;
+  max-width: 100% !important;
+  border-radius: 999px !important;
+  padding: 7px 10px !important;
+  color: var(--text-soft) !important;
+  background: var(--surface-inset) !important;
+  border: 1px solid var(--inset-border) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+  white-space: normal !important;
+}
+
+#businesses .lead-row > span:nth-child(4) {
+  grid-area: email !important;
+}
+
+#businesses .lead-row > span:nth-child(5) {
+  grid-area: rating !important;
+  justify-self: start !important;
+  text-align: left !important;
+  width: auto !important;
+  color: var(--text-soft) !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+#businesses .lead-row > span:nth-child(6) {
+  grid-area: score !important;
+  justify-self: end !important;
+  text-align: right !important;
+  width: auto !important;
+  font-size: 14px !important;
+}
+
+#businesses .lead-row > span:nth-child(7) {
+  grid-area: status !important;
+  justify-self: end !important;
+  width: auto !important;
+}
+
+#businesses .quality-badge {
+  max-width: 100% !important;
+  white-space: nowrap !important;
+}
+
+#businesses .email-found,
+#businesses .email-missing {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-radius: 14px !important;
+  padding: 9px 11px !important;
+  background: var(--surface-inset) !important;
+  border: 1px solid var(--inset-border) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.daily-dashboard {
+  margin-bottom: 24px !important;
+}
+
+.daily-action-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 1280px) {
+  .main-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .right-panel {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .daily-action-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .content {
+    padding: 22px !important;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  #audits .audit-list,
+  #audits .audit-buttons,
+  .pipeline-buttons,
+  .followup-summary,
+  .daily-action-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .stats-grid,
+  .contact-actions,
+  .form-grid,
+  .private-tools-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  #businesses .lead-row {
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "business"
+      "quality"
+      "website"
+      "email"
+      "rating"
+      "score"
+      "status" !important;
+  }
+
+  #businesses .lead-row > span:nth-child(3),
+  #businesses .lead-row > span:nth-child(5),
+  #businesses .lead-row > span:nth-child(6),
+  #businesses .lead-row > span:nth-child(7) {
+    justify-self: start !important;
+    text-align: left !important;
+  }
+}
+
