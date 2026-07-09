@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import crypto from "crypto";
 
@@ -7,6 +9,15 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+// Detrás de un proxy (Render, Railway, Fly, Nginx) para que el rate-limit
+// lea la IP real del cliente en lugar de la del proxy.
+app.set("trust proxy", 1);
+
+// ============================================================
+// SECURITY: helmet añade cabeceras HTTP seguras por defecto.
+// ============================================================
+app.use(helmet());
 
 // ============================================================
 // FIX 4: Restringe CORS al frontend en producción.
@@ -20,7 +31,61 @@ app.use(
       : {} // sin FRONTEND_URL = abierto (solo para desarrollo local)
   )
 );
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+
+// ============================================================
+// SECURITY: Rate limiting. Cada llamada a /api gasta créditos
+// reales de Outscraper, así que limitamos por IP para evitar
+// que alguien vacíe tu cuenta. Ajusta con las env vars.
+// ============================================================
+const RATE_LIMIT_WINDOW_MS =
+  Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000; // 15 min
+const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 60;
+
+const apiLimiter = rateLimit({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many requests. Please slow down and try again later.",
+  },
+});
+app.use("/api/", apiLimiter);
+
+// ============================================================
+// SECURITY: Token de acceso opcional para los endpoints caros.
+// Si defines API_ACCESS_TOKEN en .env, cada request a los
+// endpoints de scraping debe enviar ese token en la cabecera
+// "x-access-token" (o "Authorization: Bearer <token>").
+// Si NO lo defines, los endpoints quedan abiertos (solo dev local).
+// ============================================================
+const API_ACCESS_TOKEN = process.env.API_ACCESS_TOKEN || "";
+
+function requireAccessToken(req, res, next) {
+  if (!API_ACCESS_TOKEN) return next(); // sin token configurado = abierto (dev)
+
+  const headerToken =
+    req.get("x-access-token") ||
+    (req.get("authorization") || "").replace(/^Bearer\s+/i, "");
+
+  // Comparación en tiempo constante para evitar timing attacks.
+  const expected = Buffer.from(API_ACCESS_TOKEN);
+  const provided = Buffer.from(headerToken || "");
+
+  if (
+    provided.length !== expected.length ||
+    !crypto.timingSafeEqual(provided, expected)
+  ) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized: missing or invalid access token.",
+    });
+  }
+
+  return next();
+}
 
 const SAFE_LIMITS = {
   singleCityEmailLimit: 3,
@@ -563,7 +628,7 @@ async function searchAllUsaLeads({
   };
 }
 
-app.get("/api/search-leads", async (req, res) => {
+app.get("/api/search-leads", requireAccessToken, async (req, res) => {
   try {
     const apiKey = process.env.OUTSCRAPER_API_KEY;
 
@@ -628,7 +693,7 @@ app.get("/api/search-leads", async (req, res) => {
   }
 });
 
-app.post("/api/enrich-lead", async (req, res) => {
+app.post("/api/enrich-lead", requireAccessToken, async (req, res) => {
   try {
     const apiKey = process.env.OUTSCRAPER_API_KEY;
 
@@ -668,7 +733,10 @@ app.post("/api/enrich-lead", async (req, res) => {
   }
 });
 
-app.get("/api/search-leads-with-emails", async (req, res) => {
+app.get(
+  "/api/search-leads-with-emails",
+  requireAccessToken,
+  async (req, res) => {
   try {
     const apiKey = process.env.OUTSCRAPER_API_KEY;
 
@@ -800,7 +868,8 @@ app.get("/api/search-leads-with-emails", async (req, res) => {
       details: error.details,
     });
   }
-});
+  }
+);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
