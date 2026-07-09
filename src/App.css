@@ -321,7 +321,7 @@ a {
 
 .content {
   width: 100%;
-  max-width: 1450px;
+  max-width: 1560px;
   margin: 0 auto;
   padding: 34px 42px 60px;
   min-width: 0;
@@ -1388,9 +1388,15 @@ a {
 #audits .audit-list li {
   min-height: 58px;
   display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+#audits .audit-list li .quality-badge {
+  white-space: normal;
 }
 
 /* Botones del audit en 2 columnas para no verse tan largos */
@@ -2336,4 +2342,124 @@ a {
   .toast {
     animation: none;
   }
+}
+
+/* =========================================================
+   VIEW SPLIT (tool view + context/tips aside)
+   ========================================================= */
+
+.view-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 26px;
+  align-items: start;
+}
+
+.view-main {
+  min-width: 0;
+  display: grid;
+  gap: 22px;
+}
+
+.view-aside {
+  min-width: 0;
+  display: grid;
+  gap: 22px;
+  position: sticky;
+  top: 24px;
+}
+
+/* En pantallas medianas/pequeñas, una sola columna */
+@media (max-width: 1180px) {
+  .view-split {
+    grid-template-columns: 1fr;
+  }
+  .view-aside {
+    position: static;
+  }
+}
+
+/* La vista de audits tiene UNA sola tarjeta como main: que ocupe bien */
+.view-split .view-main > .card {
+  height: auto;
+}
+
+/* Cuando no hay lead seleccionado, el empty state ocupa todo el ancho */
+.view-split > .view-empty {
+  grid-column: 1 / -1;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* =========================================================
+   CONTEXT CARD (aside del lead)
+   ========================================================= */
+
+.context-card .score-circle {
+  width: 96px;
+  height: 96px;
+  font-size: 24px;
+  margin: 14px auto 4px;
+}
+
+.context-nav {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.context-nav button {
+  min-height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border-strong);
+  background: var(--surface-inset);
+  color: var(--text-soft);
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: transform 0.16s ease, border-color 0.16s ease,
+    background 0.16s ease, color 0.16s ease;
+}
+
+.context-nav button:hover {
+  transform: translateY(-1px);
+  border-color: var(--blue);
+  color: var(--text-strong);
+}
+
+.context-nav button.active {
+  color: #ffffff;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--blue), var(--blue-2));
+}
+
+/* =========================================================
+   TIPS LIST (aside de Search)
+   ========================================================= */
+
+.tips-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.tips-list li {
+  position: relative;
+  padding-left: 26px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.tips-list li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--blue), var(--blue-2));
 }

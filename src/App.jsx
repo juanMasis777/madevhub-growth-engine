@@ -2082,6 +2082,94 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
     </div>
   );
 
+  const leadContextAside = selectedLead ? (
+    <aside className="view-aside">
+      <div className="card context-card">
+        <div className="lead-detail-head">
+          <div>
+            <h3>{selectedLead.name}</h3>
+            <p className="muted">
+              {selectedLead.category} · {selectedLead.city}
+            </p>
+          </div>
+          <span
+            className={`quality-badge ${getLeadQuality(selectedLead).className}`}
+          >
+            {getLeadQuality(selectedLead).emoji}{" "}
+            {getLeadQuality(selectedLead).label}
+          </span>
+        </div>
+
+        <div className="score-circle">{selectedLead.opportunityScore}%</div>
+
+        <ul className="detail-facts">
+          <li>
+            <span>Email</span>
+            <strong>{selectedLead.email || "—"}</strong>
+          </li>
+          <li>
+            <span>Phone</span>
+            <strong>{selectedLead.phone || "—"}</strong>
+          </li>
+          <li>
+            <span>Website</span>
+            <strong>{selectedLead.website}</strong>
+          </li>
+          <li>
+            <span>Status</span>
+            <strong>{selectedLead.status}</strong>
+          </li>
+        </ul>
+
+        <div className="context-nav">
+          <button
+            className={activeView === "audits" ? "active" : ""}
+            onClick={() => setActiveView("audits")}
+          >
+            Audit
+          </button>
+          <button
+            className={activeView === "messages" ? "active" : ""}
+            onClick={() => setActiveView("messages")}
+          >
+            Message
+          </button>
+          <button
+            className={activeView === "pipeline" ? "active" : ""}
+            onClick={() => setActiveView("pipeline")}
+          >
+            Pipeline
+          </button>
+        </div>
+      </div>
+    </aside>
+  ) : null;
+
+  const searchInfoAside = (
+    <aside className="view-aside">
+      <div className="card">
+        <h3>How it works</h3>
+        <ul className="tips-list">
+          <li>Pick a city and category, then hit Find Leads.</li>
+          <li>
+            "Find Leads With Emails" also enriches contact data — it uses
+            Outscraper credits.
+          </li>
+          <li>Safe Mode caps results so your budget stays protected.</li>
+          <li>No credits? Add a lead manually and work it the same way.</li>
+        </ul>
+      </div>
+
+      <div className="card">
+        <h3>Best prospects</h3>
+        <p className="muted">
+          Businesses with <strong>No Website</strong> or{" "}
+          <strong>Facebook Only</strong> score highest — they need what you sell.
+        </p>
+      </div>
+    </aside>
+  );
+
   return (
     <main className="app">
       <aside className="sidebar">
@@ -2231,7 +2319,8 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
         {/* ===================== SEARCH ===================== */}
         {activeView === "search" && (
-          <section className="view-grid single">
+          <section className="view-split">
+            <div className="view-main">
             <div className="card" id="search-leads">
               <div className="card-header">
                 <div>
@@ -2343,6 +2432,8 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                 </button>
               </div>
             </div>
+            </div>
+            {searchInfoAside}
           </section>
         )}
 
@@ -2505,8 +2596,10 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
         {/* ===================== AUDITS ===================== */}
         {activeView === "audits" && (
-          <section className="view-grid single">
+          <section className="view-split">
             {selectedLead ? (
+              <>
+              <div className="view-main">
               <div className="card" id="audits">
                 <h3>AI Audit Preview</h3>
                 <p className="muted">{selectedLead.name}</p>
@@ -2671,6 +2764,9 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                   </div>
                 )}
               </div>
+              </div>
+              {leadContextAside}
+              </>
             ) : (
               noLeadState
             )}
@@ -2679,9 +2775,10 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
         {/* ===================== MESSAGES ===================== */}
         {activeView === "messages" && (
-          <section className="view-grid single">
+          <section className="view-split">
             {selectedLead ? (
               <>
+                <div className="view-main">
                 <div className="card">
                   <h3>Contact Actions</h3>
                   <p className="muted">
@@ -2738,6 +2835,8 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                     </button>
                   </div>
                 </div>
+                </div>
+                {leadContextAside}
               </>
             ) : (
               noLeadState
@@ -2747,9 +2846,10 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
         {/* ===================== PIPELINE ===================== */}
         {activeView === "pipeline" && (
-          <section className="view-grid single">
+          <section className="view-split">
             {selectedLead ? (
               <>
+                <div className="view-main">
                 <div className="card" id="pipeline">
                   <h3>Pipeline Status — {selectedLead.name}</h3>
                   <p className="muted">Move this lead through your sales stages.</p>
@@ -2862,6 +2962,8 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                     ))}
                   </div>
                 </div>
+                </div>
+                {leadContextAside}
               </>
             ) : (
               noLeadState
@@ -2942,6 +3044,31 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                     : "Switch to Dark Mode"}
                 </button>
               </div>
+            </div>
+
+            <div className="card">
+              <h3>Safe Mode</h3>
+              <p className="muted">
+                Limits are active to protect your Outscraper credits.
+              </p>
+              <ul className="detail-facts">
+                <li>
+                  <span>City email limit</span>
+                  <strong>{SAFE_MODE_CONFIG.singleCityEmailLimit}</strong>
+                </li>
+                <li>
+                  <span>All-USA email limit</span>
+                  <strong>{SAFE_MODE_CONFIG.allUsaEmailLimit}</strong>
+                </li>
+                <li>
+                  <span>Normal search limit</span>
+                  <strong>{SAFE_MODE_CONFIG.normalSearchLimit}</strong>
+                </li>
+                <li>
+                  <span>Total leads</span>
+                  <strong>{leads.length}</strong>
+                </li>
+              </ul>
             </div>
           </section>
         )}
