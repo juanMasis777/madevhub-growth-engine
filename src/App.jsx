@@ -15,6 +15,11 @@ import {
   Clock,
   Sun,
   Moon,
+  Users,
+  Flame,
+  CheckCircle2,
+  CalendarClock,
+  Target,
 } from "lucide-react";
 import { useTheme } from "./useTheme";
 import "./App.css";
@@ -181,6 +186,14 @@ function getOpportunityScoreFromWebsite(websiteStatus) {
   return 70;
 }
 
+function getScoreColor(score) {
+  const value = Number(score) || 0;
+  if (value >= 85) return "#22c55e";
+  if (value >= 70) return "#3b82f6";
+  if (value >= 50) return "#f59e0b";
+  return "#94a3b8";
+}
+
 function getLeadQuality(lead) {
   if (!lead) {
     return {
@@ -268,6 +281,7 @@ export default function App() {
   const [category, setCategory] = useState("All");
   const [websiteStatus, setWebsiteStatus] = useState("Any");
   const [hotLeadsOnly, setHotLeadsOnly] = useState(false);
+  const [leadSearch, setLeadSearch] = useState("");
 
   const [contactMode, setContactMode] = useState(() => {
     const savedLeads = loadFromLocalStorage(STORAGE_KEYS.leads, INITIAL_LEADS);
@@ -309,6 +323,8 @@ export default function App() {
   }, [activityLog]);
 
   const filteredLeads = useMemo(() => {
+    const query = leadSearch.trim().toLowerCase();
+
     return leads.filter((lead) => {
       const matchesCity =
         city === "All" || city === "All USA" || lead.city === city;
@@ -317,10 +333,21 @@ export default function App() {
         websiteStatus === "Any" || lead.website === websiteStatus;
       const leadQuality = getLeadQuality(lead);
       const matchesQuality = !hotLeadsOnly || leadQuality.level === "hot";
+      const matchesSearch =
+        !query ||
+        [lead.name, lead.email, lead.city, lead.category, lead.phone]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(query));
 
-      return matchesCity && matchesCategory && matchesWebsite && matchesQuality;
+      return (
+        matchesCity &&
+        matchesCategory &&
+        matchesWebsite &&
+        matchesQuality &&
+        matchesSearch
+      );
     });
-  }, [leads, city, category, websiteStatus, hotLeadsOnly]);
+  }, [leads, city, category, websiteStatus, hotLeadsOnly, leadSearch]);
 
   const stats = useMemo(() => {
     return {
@@ -1911,6 +1938,28 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
   const emailRate = leads.length
     ? Math.round((leadsWithEmail / leads.length) * 100)
     : 0;
+  const conversionRate = leads.length
+    ? Math.round((stats.closed / leads.length) * 100)
+    : 0;
+
+  const followUpsDue = leads.filter((lead) => {
+    const status = getFollowUpStatus(lead);
+    return status === "Overdue" || status === "Due today";
+  });
+
+  const hotLeadsToContact = leads.filter(
+    (lead) => getLeadQuality(lead).level === "hot" && lead.status === "New"
+  );
+
+  const readyToEmail = leads.filter(
+    (lead) =>
+      lead.email && (lead.status === "New" || lead.status === "Contacted")
+  );
+
+  const openLeadInView = (lead, view) => {
+    handleSelectLead(lead);
+    setActiveView(view);
+  };
 
   const leadFormCard = showLeadForm ? (
     <div className="card">
@@ -2082,94 +2131,6 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
     </div>
   );
 
-  const leadContextAside = selectedLead ? (
-    <aside className="view-aside">
-      <div className="card context-card">
-        <div className="lead-detail-head">
-          <div>
-            <h3>{selectedLead.name}</h3>
-            <p className="muted">
-              {selectedLead.category} · {selectedLead.city}
-            </p>
-          </div>
-          <span
-            className={`quality-badge ${getLeadQuality(selectedLead).className}`}
-          >
-            {getLeadQuality(selectedLead).emoji}{" "}
-            {getLeadQuality(selectedLead).label}
-          </span>
-        </div>
-
-        <div className="score-circle">{selectedLead.opportunityScore}%</div>
-
-        <ul className="detail-facts">
-          <li>
-            <span>Email</span>
-            <strong>{selectedLead.email || "—"}</strong>
-          </li>
-          <li>
-            <span>Phone</span>
-            <strong>{selectedLead.phone || "—"}</strong>
-          </li>
-          <li>
-            <span>Website</span>
-            <strong>{selectedLead.website}</strong>
-          </li>
-          <li>
-            <span>Status</span>
-            <strong>{selectedLead.status}</strong>
-          </li>
-        </ul>
-
-        <div className="context-nav">
-          <button
-            className={activeView === "audits" ? "active" : ""}
-            onClick={() => setActiveView("audits")}
-          >
-            Audit
-          </button>
-          <button
-            className={activeView === "messages" ? "active" : ""}
-            onClick={() => setActiveView("messages")}
-          >
-            Message
-          </button>
-          <button
-            className={activeView === "pipeline" ? "active" : ""}
-            onClick={() => setActiveView("pipeline")}
-          >
-            Pipeline
-          </button>
-        </div>
-      </div>
-    </aside>
-  ) : null;
-
-  const searchInfoAside = (
-    <aside className="view-aside">
-      <div className="card">
-        <h3>How it works</h3>
-        <ul className="tips-list">
-          <li>Pick a city and category, then hit Find Leads.</li>
-          <li>
-            "Find Leads With Emails" also enriches contact data — it uses
-            Outscraper credits.
-          </li>
-          <li>Safe Mode caps results so your budget stays protected.</li>
-          <li>No credits? Add a lead manually and work it the same way.</li>
-        </ul>
-      </div>
-
-      <div className="card">
-        <h3>Best prospects</h3>
-        <p className="muted">
-          Businesses with <strong>No Website</strong> or{" "}
-          <strong>Facebook Only</strong> score highest — they need what you sell.
-        </p>
-      </div>
-    </aside>
-  );
-
   return (
     <main className="app">
       <aside className="sidebar">
@@ -2242,10 +2203,145 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
         {activeView === "dashboard" && (
           <>
             <section className="stats-grid">
-              <StatCard title="Total Leads" value={stats.total} />
-              <StatCard title="Hot Leads" value={stats.hotLeads} />
-              <StatCard title="Contacted" value={stats.contacted} />
-              <StatCard title="Closed Deals" value={stats.closed} />
+              <StatCard
+                title="Total Leads"
+                value={stats.total}
+                icon={Users}
+                accent="blue"
+                hint={`${leadsWithEmail} with email`}
+              />
+              <StatCard
+                title="Hot Leads"
+                value={stats.hotLeads}
+                icon={Flame}
+                accent="orange"
+                hint="Best prospects"
+              />
+              <StatCard
+                title="Contacted"
+                value={stats.contacted}
+                icon={Send}
+                accent="violet"
+                hint={`${emailRate}% email rate`}
+              />
+              <StatCard
+                title="Closed Deals"
+                value={stats.closed}
+                icon={CheckCircle2}
+                accent="green"
+                hint={`${conversionRate}% conversion`}
+              />
+            </section>
+
+            <section className="daily-dashboard">
+              <div className="daily-dashboard-header">
+                <div>
+                  <h3>Today's Focus</h3>
+                  <p>
+                    Your highest-impact actions right now — work these first to
+                    keep the pipeline moving.
+                  </p>
+                </div>
+                <span>
+                  {followUpsDue.length + hotLeadsToContact.length} actions ready
+                </span>
+              </div>
+
+              <div className="daily-action-grid daily-action-grid--focus">
+                <div className="daily-action-card">
+                  <div className="daily-action-card-header">
+                    <span className="accent-red">
+                      <CalendarClock size={18} />
+                    </span>
+                    <div>
+                      <strong>Follow-ups Due</strong>
+                      <small>{followUpsDue.length} pending</small>
+                    </div>
+                  </div>
+                  <div className="daily-action-list">
+                    {followUpsDue.slice(0, 3).map((lead) => (
+                      <button
+                        key={lead.id}
+                        type="button"
+                        onClick={() => openLeadInView(lead, "pipeline")}
+                      >
+                        <div>
+                          <strong>{lead.name}</strong>
+                          <small>
+                            {lead.followUpDate} · {getFollowUpStatus(lead)}
+                          </small>
+                        </div>
+                        <em>Open</em>
+                      </button>
+                    ))}
+                    {followUpsDue.length === 0 && (
+                      <p>No follow-ups due. You're all caught up. 🎉</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="daily-action-card">
+                  <div className="daily-action-card-header">
+                    <span className="accent-orange">
+                      <Flame size={18} />
+                    </span>
+                    <div>
+                      <strong>Hot Leads to Contact</strong>
+                      <small>{hotLeadsToContact.length} waiting</small>
+                    </div>
+                  </div>
+                  <div className="daily-action-list">
+                    {hotLeadsToContact.slice(0, 3).map((lead) => (
+                      <button
+                        key={lead.id}
+                        type="button"
+                        onClick={() => openLeadInView(lead, "messages")}
+                      >
+                        <div>
+                          <strong>{lead.name}</strong>
+                          <small>
+                            {lead.category} · {getLeadQuality(lead).score}/100
+                          </small>
+                        </div>
+                        <em>Reach out</em>
+                      </button>
+                    ))}
+                    {hotLeadsToContact.length === 0 && (
+                      <p>No new hot leads. Run a search to find more. 🔍</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="daily-action-card">
+                  <div className="daily-action-card-header">
+                    <span className="accent-blue">
+                      <Target size={18} />
+                    </span>
+                    <div>
+                      <strong>Ready to Email</strong>
+                      <small>{readyToEmail.length} have an email</small>
+                    </div>
+                  </div>
+                  <div className="daily-action-list">
+                    {readyToEmail.slice(0, 3).map((lead) => (
+                      <button
+                        key={lead.id}
+                        type="button"
+                        onClick={() => openLeadInView(lead, "messages")}
+                      >
+                        <div>
+                          <strong>{lead.name}</strong>
+                          <small>{lead.email}</small>
+                        </div>
+                        <em>Write</em>
+                      </button>
+                    ))}
+                    {readyToEmail.length === 0 && (
+                      <p>No emails yet. Enrich leads to unlock outreach. ✉️</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </section>
 
             <section className="view-grid">
@@ -2319,8 +2415,7 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
         {/* ===================== SEARCH ===================== */}
         {activeView === "search" && (
-          <section className="view-split">
-            <div className="view-main">
+          <section className="work-grid">
             <div className="card" id="search-leads">
               <div className="card-header">
                 <div>
@@ -2414,26 +2509,72 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
               </div>
             </div>
 
-            <div className="card private-tools-card">
-              <h3>Add a Lead Manually</h3>
-              <p className="muted">
-                Don't want to spend credits? Add a business by hand and work it
-                like any other lead.
-              </p>
-              <div className="private-tools-grid">
-                <button className="primary-btn" onClick={startAddLead}>
-                  Add Lead Manually
-                </button>
-                <button
-                  className="secondary-btn"
-                  onClick={() => setActiveView("leads")}
-                >
-                  View Businesses
-                </button>
+            <div className="work-col">
+              <div className="card private-tools-card">
+                <h3>Add a Lead Manually</h3>
+                <p className="muted">
+                  Don't want to spend credits? Add a business by hand and work it
+                  like any other lead.
+                </p>
+                <div className="private-tools-grid">
+                  <button className="primary-btn" onClick={startAddLead}>
+                    Add Lead Manually
+                  </button>
+                  <button
+                    className="secondary-btn"
+                    onClick={() => setActiveView("leads")}
+                  >
+                    View Businesses
+                  </button>
+                </div>
+              </div>
+
+              <div className="card">
+                <h3>Pro Tips</h3>
+                <p className="muted">
+                  Get the most out of every Outscraper credit.
+                </p>
+                <ul className="tips-list">
+                  <li>
+                    <span className="tips-icon">🎯</span>
+                    <div>
+                      <strong>Target "No Website" &amp; "Facebook Only"</strong>
+                      <small>
+                        These businesses need you most and close fastest.
+                      </small>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="tips-icon">🔥</span>
+                    <div>
+                      <strong>Work Hot Leads first</strong>
+                      <small>
+                        High rating + many reviews = a business that reinvests.
+                      </small>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="tips-icon">✉️</span>
+                    <div>
+                      <strong>Use "Find Leads With Emails" sparingly</strong>
+                      <small>
+                        Enrichment costs more credits — Safe Mode caps it for you.
+                      </small>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="tips-icon">📄</span>
+                    <div>
+                      <strong>Send an audit, not a pitch</strong>
+                      <small>
+                        Lead with value: generate an audit and open the
+                        conversation.
+                      </small>
+                    </div>
+                  </li>
+                </ul>
               </div>
             </div>
-            </div>
-            {searchInfoAside}
           </section>
         )}
 
@@ -2444,8 +2585,17 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
               {leadFormCard}
 
               <div className="card" id="businesses">
-                <div className="card-header">
+                <div className="card-header businesses-header">
                   <h3>{filteredLeads.length} Leads Found</h3>
+                  <div className="lead-search">
+                    <Search size={16} />
+                    <input
+                      type="search"
+                      value={leadSearch}
+                      onChange={(event) => setLeadSearch(event.target.value)}
+                      placeholder="Search by name, email, city..."
+                    />
+                  </div>
                 </div>
 
                 <div className="table">
@@ -2534,7 +2684,15 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                     </span>
                   </div>
 
-                  <div className="score-circle">
+                  <div
+                    className="score-circle"
+                    style={{
+                      "--score": selectedLead.opportunityScore,
+                      "--score-color": getScoreColor(
+                        selectedLead.opportunityScore
+                      ),
+                    }}
+                  >
                     {selectedLead.opportunityScore}%
                   </div>
 
@@ -2596,15 +2754,22 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
         {/* ===================== AUDITS ===================== */}
         {activeView === "audits" && (
-          <section className="view-split">
+          <section className="work-grid work-grid--audits">
             {selectedLead ? (
               <>
-              <div className="view-main">
               <div className="card" id="audits">
                 <h3>AI Audit Preview</h3>
                 <p className="muted">{selectedLead.name}</p>
 
-                <div className="score-circle">
+                <div
+                  className="score-circle"
+                  style={{
+                    "--score": selectedLead.opportunityScore,
+                    "--score-color": getScoreColor(
+                      selectedLead.opportunityScore
+                    ),
+                  }}
+                >
                   {selectedLead.opportunityScore}%
                 </div>
 
@@ -2757,15 +2922,34 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                   </button>
                 </div>
 
-                {generatedAudit && (
+              </div>
+
+              <div className="card audit-report-card">
+                <div className="card-header">
+                  <div>
+                    <h3>Generated Audit</h3>
+                    <p className="muted">
+                      Full written report, ready to copy or export as PDF.
+                    </p>
+                  </div>
+                </div>
+
+                {generatedAudit ? (
                   <div className="audit-report">
-                    <h4>Generated Audit</h4>
                     <p>{generatedAudit}</p>
+                  </div>
+                ) : (
+                  <div className="empty-state audit-empty">
+                    <span className="audit-empty-icon">
+                      <Sparkles size={26} />
+                    </span>
+                    <p>
+                      Click <strong>Generate Audit</strong> to create a full
+                      digital-presence report for {selectedLead.name}.
+                    </p>
                   </div>
                 )}
               </div>
-              </div>
-              {leadContextAside}
               </>
             ) : (
               noLeadState
@@ -2775,10 +2959,10 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
         {/* ===================== MESSAGES ===================== */}
         {activeView === "messages" && (
-          <section className="view-split">
+          <section className="work-grid work-grid--messages">
             {selectedLead ? (
               <>
-                <div className="view-main">
+                <div className="work-col">
                 <div className="card">
                   <h3>Contact Actions</h3>
                   <p className="muted">
@@ -2836,7 +3020,88 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                   </div>
                 </div>
                 </div>
-                {leadContextAside}
+
+                <div className="work-col">
+                <div className="card">
+                  <div className="card-header">
+                    <div>
+                      <h3>Outreach Sequence</h3>
+                      <p className="muted">
+                        Generate a full multi-touch sequence — first message,
+                        follow-ups, and a call script — tailored to{" "}
+                        {selectedLead.name}.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="outreach-grid">
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => generateOutreachSequence("email")}
+                    >
+                      <Mail size={16} /> Initial Email
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => generateOutreachSequence("instagram")}
+                    >
+                      <MessageCircle size={16} /> Instagram DM
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => generateOutreachSequence("followup1")}
+                    >
+                      <Clock size={16} /> Follow-up 1
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => generateOutreachSequence("followup2")}
+                    >
+                      <Clock size={16} /> Follow-up 2
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => generateOutreachSequence("call")}
+                    >
+                      <Phone size={16} /> Call Script
+                    </button>
+                  </div>
+
+                  {outreachMessage && (
+                    <div className="outreach-preview">
+                      <div className="outreach-preview-header">
+                        <strong>{outreachTitle}</strong>
+                        <span>
+                          {getLeadQuality(selectedLead).emoji}{" "}
+                          {getLeadQuality(selectedLead).label}
+                        </span>
+                      </div>
+                      <p>{outreachMessage}</p>
+                      <div className="actions">
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={copyOutreachMessage}
+                        >
+                          <Copy size={16} /> Copy
+                        </button>
+                        <button
+                          type="button"
+                          className="primary-btn"
+                          onClick={markOutreachContacted}
+                        >
+                          <Send size={16} /> Mark as Contacted
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                </div>
               </>
             ) : (
               noLeadState
@@ -2846,10 +3111,10 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
         {/* ===================== PIPELINE ===================== */}
         {activeView === "pipeline" && (
-          <section className="view-split">
+          <section className="work-grid">
             {selectedLead ? (
               <>
-                <div className="view-main">
+                <div className="work-col">
                 <div className="card" id="pipeline">
                   <h3>Pipeline Status — {selectedLead.name}</h3>
                   <p className="muted">Move this lead through your sales stages.</p>
@@ -2867,6 +3132,70 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="card">
+                  <div className="lead-detail-head">
+                    <div>
+                      <h3>Lead Snapshot</h3>
+                      <p className="muted">
+                        {selectedLead.category} · {selectedLead.city}
+                      </p>
+                    </div>
+                    <span
+                      className={`quality-badge ${
+                        getLeadQuality(selectedLead).className
+                      }`}
+                    >
+                      {getLeadQuality(selectedLead).emoji}{" "}
+                      {getLeadQuality(selectedLead).label}
+                    </span>
+                  </div>
+
+                  <ul className="detail-facts">
+                    <li>
+                      <span>Opportunity</span>
+                      <strong>{selectedLead.opportunityScore}%</strong>
+                    </li>
+                    <li>
+                      <span>Website</span>
+                      <strong>{selectedLead.website}</strong>
+                    </li>
+                    <li>
+                      <span>Email</span>
+                      <strong>{selectedLead.email || "Not found"}</strong>
+                    </li>
+                    <li>
+                      <span>Phone</span>
+                      <strong>{selectedLead.phone || "Not found"}</strong>
+                    </li>
+                    <li>
+                      <span>Rating</span>
+                      <strong>
+                        {selectedLead.rating} ⭐ ({selectedLead.reviews})
+                      </strong>
+                    </li>
+                    <li>
+                      <span>Status</span>
+                      <strong>{selectedLead.status}</strong>
+                    </li>
+                  </ul>
+
+                  <div className="detail-actions">
+                    <button
+                      className="secondary-btn full"
+                      onClick={() => setActiveView("audits")}
+                    >
+                      Open Audit
+                    </button>
+                    <button
+                      className="secondary-btn full"
+                      onClick={() => setActiveView("messages")}
+                    >
+                      Write Message
+                    </button>
+                  </div>
+                </div>
                 </div>
 
                 <div className="card" id="follow-up">
@@ -2962,8 +3291,6 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                     ))}
                   </div>
                 </div>
-                </div>
-                {leadContextAside}
               </>
             ) : (
               noLeadState
@@ -3045,31 +3372,6 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                 </button>
               </div>
             </div>
-
-            <div className="card">
-              <h3>Safe Mode</h3>
-              <p className="muted">
-                Limits are active to protect your Outscraper credits.
-              </p>
-              <ul className="detail-facts">
-                <li>
-                  <span>City email limit</span>
-                  <strong>{SAFE_MODE_CONFIG.singleCityEmailLimit}</strong>
-                </li>
-                <li>
-                  <span>All-USA email limit</span>
-                  <strong>{SAFE_MODE_CONFIG.allUsaEmailLimit}</strong>
-                </li>
-                <li>
-                  <span>Normal search limit</span>
-                  <strong>{SAFE_MODE_CONFIG.normalSearchLimit}</strong>
-                </li>
-                <li>
-                  <span>Total leads</span>
-                  <strong>{leads.length}</strong>
-                </li>
-              </ul>
-            </div>
           </section>
         )}
       </section>
@@ -3086,11 +3388,19 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
   );
 }
 
-function StatCard({ title, value }) {
+function StatCard({ title, value, icon: Icon, accent = "blue", hint }) {
   return (
-    <div className="stat-card">
-      <p>{title}</p>
+    <div className={`stat-card stat-accent-${accent}`}>
+      <div className="stat-card-top">
+        {Icon && (
+          <span className="stat-icon">
+            <Icon size={20} />
+          </span>
+        )}
+        {hint && <span className="stat-hint">{hint}</span>}
+      </div>
       <h3>{value}</h3>
+      <p>{title}</p>
     </div>
   );
 }

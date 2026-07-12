@@ -321,7 +321,7 @@ a {
 
 .content {
   width: 100%;
-  max-width: 1560px;
+  max-width: 1450px;
   margin: 0 auto;
   padding: 34px 42px 60px;
   min-width: 0;
@@ -1388,15 +1388,9 @@ a {
 #audits .audit-list li {
   min-height: 58px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
   align-items: center;
   justify-content: center;
   text-align: center;
-}
-
-#audits .audit-list li .quality-badge {
-  white-space: normal;
 }
 
 /* Botones del audit en 2 columnas para no verse tan largos */
@@ -2344,144 +2338,651 @@ a {
   }
 }
 
+
 /* =========================================================
-   VIEW SPLIT (tool view + context/tips aside)
+   ✦ PREMIUM ENHANCEMENT LAYER ✦
+   Refinamiento visual final: tipografía display, fondo vivo,
+   micro-interacciones, tarjetas de stats con icono, anillo de
+   score dinámico y pulido general. Se carga al final para
+   ganar la cascada sin tocar el layout que ya funciona.
    ========================================================= */
 
-.view-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 26px;
-  align-items: start;
+:root {
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --score-track: rgba(148, 163, 184, 0.20);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.view-main {
-  min-width: 0;
-  display: grid;
-  gap: 22px;
+:root[data-theme="dark"] {
+  --score-track: rgba(148, 163, 184, 0.16);
 }
 
-.view-aside {
-  min-width: 0;
-  display: grid;
-  gap: 22px;
-  position: sticky;
-  top: 24px;
+/* ---------- Tipografía display para títulos ---------- */
+.brand h1,
+.topbar h2,
+.card h3,
+.daily-dashboard-header h3,
+.stat-card h3,
+.pipeline-stat-count,
+.score-circle {
+  font-family: var(--font-display);
+  font-feature-settings: "ss01" 1;
 }
 
-/* En pantallas medianas/pequeñas, una sola columna */
-@media (max-width: 1180px) {
-  .view-split {
-    grid-template-columns: 1fr;
+/* ---------- Fondo vivo con orbes suaves ---------- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38vw 38vw at 12% 8%, var(--page-glow-1), transparent 60%),
+    radial-gradient(34vw 34vw at 88% 4%, var(--page-glow-2), transparent 58%),
+    radial-gradient(30vw 30vw at 78% 92%, var(--page-glow-1), transparent 60%);
+  opacity: 0.9;
+  animation: orbFloat 22s ease-in-out infinite alternate;
+}
+
+@keyframes orbFloat {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
   }
-  .view-aside {
-    position: static;
+  50% {
+    transform: translate3d(2%, -1.5%, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(-1.5%, 1.5%, 0) scale(1.02);
   }
 }
 
-/* La vista de audits tiene UNA sola tarjeta como main: que ocupe bien */
-.view-split .view-main > .card {
-  height: auto;
+/* ---------- Entrada suave de las vistas ---------- */
+.stats-grid,
+.daily-dashboard,
+.view-grid,
+.main-grid {
+  animation: viewIn 0.45s var(--ease-out) both;
 }
 
-/* Cuando no hay lead seleccionado, el empty state ocupa todo el ancho */
-.view-split > .view-empty {
-  grid-column: 1 / -1;
-  max-width: 640px;
-  margin: 0 auto;
+@keyframes viewIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-/* =========================================================
-   CONTEXT CARD (aside del lead)
-   ========================================================= */
-
-.context-card .score-circle {
-  width: 96px;
-  height: 96px;
-  font-size: 24px;
-  margin: 14px auto 4px;
-}
-
-.context-nav {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.context-nav button {
-  min-height: 40px;
-  border-radius: 12px;
-  border: 1px solid var(--card-border-strong);
-  background: var(--surface-inset);
-  color: var(--text-soft);
-  font-size: 12.5px;
-  font-weight: 700;
-  transition: transform 0.16s ease, border-color 0.16s ease,
-    background 0.16s ease, color 0.16s ease;
-}
-
-.context-nav button:hover {
-  transform: translateY(-1px);
-  border-color: var(--blue);
-  color: var(--text-strong);
-}
-
-.context-nav button.active {
-  color: #ffffff;
-  border-color: transparent;
-  background: linear-gradient(135deg, var(--blue), var(--blue-2));
-}
-
-/* =========================================================
-   TIPS LIST (aside de Search)
-   ========================================================= */
-
-.tips-list {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
-  display: grid;
-  gap: 12px;
-}
-
-.tips-list li {
+/* ---------- Cards: glass + elevación al hover ---------- */
+.card {
   position: relative;
-  padding-left: 26px;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--text-soft);
+  backdrop-filter: saturate(1.15) blur(2px);
+  transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out),
+    border-color 0.25s var(--ease-out);
 }
 
-.tips-list li::before {
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--card-border-strong);
+  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.16);
+}
+
+:root[data-theme="dark"] .card:hover {
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- STAT CARDS premium con icono ---------- */
+.stat-card {
+  text-align: left;
+  padding: 22px 22px 20px;
+  transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out),
+    border-color 0.25s var(--ease-out);
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-glow);
+}
+
+.stat-card::before {
+  width: 150px;
+  height: 150px;
+  top: -80px;
+  right: -60px;
+  background: radial-gradient(circle, var(--stat-glow, rgba(79, 99, 255, 0.22)), transparent 68%);
+  transition: opacity 0.25s ease;
+}
+
+.stat-card-top {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stat-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--stat-c1, #4f63ff), var(--stat-c2, #6d5dfc));
+  box-shadow: 0 10px 24px var(--stat-shadow, rgba(79, 99, 255, 0.35));
+}
+
+.stat-hint {
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--surface-inset);
+  border: 1px solid var(--inset-border);
+  white-space: nowrap;
+}
+
+.stat-card h3 {
+  margin: 0;
+  font-size: 40px;
+}
+
+.stat-card p {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.stat-accent-blue {
+  --stat-c1: #4f7bff;
+  --stat-c2: #6d5dfc;
+  --stat-glow: rgba(79, 123, 255, 0.24);
+  --stat-shadow: rgba(79, 99, 255, 0.4);
+}
+.stat-accent-orange {
+  --stat-c1: #fb923c;
+  --stat-c2: #ef4444;
+  --stat-glow: rgba(251, 146, 60, 0.24);
+  --stat-shadow: rgba(239, 68, 68, 0.38);
+}
+.stat-accent-violet {
+  --stat-c1: #8b5cf6;
+  --stat-c2: #d946ef;
+  --stat-glow: rgba(139, 92, 246, 0.24);
+  --stat-shadow: rgba(139, 92, 246, 0.4);
+}
+.stat-accent-green {
+  --stat-c1: #22c55e;
+  --stat-c2: #14b8a6;
+  --stat-glow: rgba(34, 197, 94, 0.22);
+  --stat-shadow: rgba(20, 184, 166, 0.38);
+}
+
+/* ---------- SCORE RING dinámico según el score ---------- */
+.score-circle {
+  border: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  color: var(--text-strong);
+  background:
+    conic-gradient(
+      var(--score-color, #22c55e) calc(var(--score, 90) * 1%),
+      var(--score-track) 0
+    );
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+  animation: ringIn 0.8s var(--ease-out) both;
+}
+
+/* círculo interior (hueco): pintado bajo el número gracias a z-index negativo */
+.score-circle::after {
   content: "";
   position: absolute;
-  left: 4px;
-  top: 7px;
-  width: 8px;
-  height: 8px;
+  inset: 14px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--blue), var(--blue-2));
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--card-border);
+  z-index: -1;
 }
 
-/* =========================================================
-   SETTINGS — masonry para que las tarjetas se acomoden sin huecos
-   ========================================================= */
-
-.settings-grid {
-  display: block;
-  column-count: 2;
-  column-gap: 26px;
+@keyframes ringIn {
+  from {
+    transform: rotate(-12deg) scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
 }
 
-.settings-grid > .card {
-  break-inside: avoid;
-  margin-bottom: 26px;
+/* ---------- SIDEBAR: barra de acento en activo ---------- */
+.nav button {
+  position: relative;
+  overflow: hidden;
+}
+
+.nav button.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 22px;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, #67e8f9, #8b5cf6);
+}
+
+.brand-icon {
+  position: relative;
+}
+
+.brand-icon::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #67e8f9, #4f63ff, #8b5cf6);
+  opacity: 0.35;
+  filter: blur(9px);
+  z-index: -1;
+}
+
+/* ---------- BOTONES: brillo sutil al hover ---------- */
+.primary-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.primary-btn::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  transform: skewX(-18deg);
+  transition: left 0.6s var(--ease-out);
+}
+
+.primary-btn:hover::after {
+  left: 130%;
+}
+
+.primary-btn:hover {
+  box-shadow: 0 20px 44px rgba(79, 99, 255, 0.42);
+}
+
+/* ---------- BUSINESSES: buscador de leads ---------- */
+.businesses-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.lead-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 240px;
+  padding: 0 14px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--surface-inset);
+  border: 1px solid var(--card-border-strong);
+  color: var(--muted);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.lead-search:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px rgba(79, 99, 255, 0.14);
+}
+
+.lead-search input {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
   width: 100%;
 }
 
-@media (max-width: 1024px) {
-  .settings-grid {
-    column-count: 1;
+.lead-search input::placeholder {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ---------- TODAY'S FOCUS: 3 columnas + iconos con color ---------- */
+.daily-action-grid--focus {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.daily-action-card {
+  transition: transform 0.22s var(--ease-out), border-color 0.22s var(--ease-out);
+}
+
+.daily-action-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--card-border-strong);
+}
+
+.daily-action-card-header > span.accent-red {
+  color: #fff;
+  background: linear-gradient(135deg, #fb7185, #ef4444);
+  border-color: transparent;
+}
+.daily-action-card-header > span.accent-orange {
+  color: #fff;
+  background: linear-gradient(135deg, #fbbf24, #f97316);
+  border-color: transparent;
+}
+.daily-action-card-header > span.accent-blue {
+  color: #fff;
+  background: linear-gradient(135deg, #38bdf8, #4f63ff);
+  border-color: transparent;
+}
+
+.daily-action-list button em {
+  background: linear-gradient(135deg, var(--blue), var(--blue-2));
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .daily-action-grid--focus {
+    grid-template-columns: 1fr !important;
   }
+}
+
+/* ---------- OUTREACH: botones en 3 columnas ---------- */
+.outreach-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.outreach-grid button {
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .outreach-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Badge de calidad sin recortar en el audit ---------- */
+.audit-list .quality-badge {
+  max-width: none;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+/* ---------- CONTACT ACTIONS activo con acento ---------- */
+.contact-actions button.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--blue), var(--blue-2));
+  border-color: transparent;
+  box-shadow: 0 12px 26px rgba(79, 99, 255, 0.3);
+}
+
+/* ---------- Safe mode badge con puntito vivo ---------- */
+.safe-mode-badge::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: var(--green);
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  animation: pulseDot 2s ease-out infinite;
+}
+
+@keyframes pulseDot {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(34, 197, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+/* ---------- Scrollbars sutiles ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--card-border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--card-border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--blue);
+  background-clip: padding-box;
+}
+
+/* ---------- Focus visible accesible ---------- */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  .stats-grid,
+  .daily-dashboard,
+  .view-grid,
+  .main-grid,
+  .work-grid,
+  .score-circle,
+  .safe-mode-badge::before {
+    animation: none !important;
+  }
+}
+
+
+/* =========================================================
+   ✦ LAYOUT DE TRABAJO A 2 COLUMNAS ✦
+   Las vistas por-lead (Search, Audits, Messages, Pipeline)
+   ahora llenan el ancho con dos columnas balanceadas en vez
+   de dejar la mitad derecha vacía.
+   ========================================================= */
+
+.work-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px;
+  align-items: start;
+  animation: viewIn 0.45s var(--ease-out) both;
+}
+
+.work-col {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+/* Audits: la vista previa un poco más estrecha, el reporte más ancho */
+.work-grid--audits {
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+}
+
+@media (max-width: 1080px) {
+  .work-grid,
+  .work-grid--audits,
+  .work-grid--messages {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Settings: 3 tarjetas en una fila, sin celda vacía */
+.settings-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .settings-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Panel del reporte de audit (columna derecha) */
+.audit-report-card .audit-report {
+  margin-top: 4px;
+  max-height: 620px !important;
+}
+
+.audit-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 52px 28px;
+  text-align: center;
+}
+
+.audit-empty-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  color: var(--blue);
+  background: var(--surface-2);
+  border: 1px solid var(--card-border-strong);
+}
+
+.audit-empty p {
+  max-width: 340px;
+  margin: 0;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.audit-empty strong {
+  color: var(--text-strong);
+}
+
+/* Businesses: el panel de detalle sigue visible al hacer scroll */
+@media (min-width: 1281px) {
+  .main-grid .right-panel {
+    position: sticky;
+    top: 20px;
+  }
+}
+
+/* Search filters: layout cómodo dentro de la tarjeta más estrecha */
+.work-grid .filters {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.work-grid .filters > label:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+.work-grid .filter-actions {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 560px) {
+  .work-grid .filters,
+  .work-grid .filter-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Pro Tips list (Search view) */
+.tips-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 11px;
+}
+
+.tips-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  border: 1px solid var(--inset-border);
+}
+
+.tips-icon {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  font-size: 17px;
+  background: var(--surface-2);
+  border: 1px solid var(--card-border-strong);
+}
+
+.tips-list strong {
+  display: block;
+  color: var(--text-strong);
+  font-size: 13.5px;
+  line-height: 1.3;
+}
+
+.tips-list small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* Today's Focus: tarjetas de igual altura para un look más limpio */
+.daily-action-grid--focus {
+  align-items: stretch;
+}
+
+.daily-action-grid--focus .daily-action-card {
+  display: flex;
+  flex-direction: column;
 }
