@@ -454,7 +454,7 @@ function isLeadInRequestedLocation(lead, city) {
 // FIX 1 (cont.): el email de mapPlaceToLead también se valida.
 // FIX 2: id ahora usa crypto.randomUUID() en vez de Date.now() + index.
 // ============================================================
-function mapPlaceToLead(place, index, city, category) {
+function mapPlaceToLead(place, city, category) {
   const websiteUrl = getWebsiteUrl(place);
   const address = getAddress(place);
   const googleMapsUrl = getGoogleMapsUrl(place);
@@ -526,8 +526,8 @@ async function searchGoogleMapsLeads({ apiKey, city, category, limit }) {
 
   return {
     query,
-    leads: flatResults.map((place, index) =>
-      mapPlaceToLead(place, index, cityConfig.label, category)
+    leads: flatResults.map((place) =>
+      mapPlaceToLead(place, cityConfig.label, category)
     ),
   };
 }

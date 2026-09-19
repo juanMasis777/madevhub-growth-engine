@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { jsPDF } from "jspdf";
 import {
   LayoutDashboard,
   Search,
@@ -174,6 +173,35 @@ function createSafeFileName(name) {
   );
 }
 
+const OUTREACH_STEPS = [
+  { id: "email", label: "Initial Email" },
+  { id: "instagram", label: "Instagram DM" },
+  { id: "followup1", label: "Follow-up 1" },
+  { id: "followup2", label: "Follow-up 2" },
+  { id: "call", label: "Call Script" },
+];
+
+const CLOSED_STATUSES = ["Closed", "Lost"];
+
+function getTodayDateKey() {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${today.getFullYear()}-${month}-${day}`;
+}
+
+function isLeadStillOpen(lead) {
+  return !CLOSED_STATUSES.includes(lead?.status);
+}
+
+// jsPDF arrastra html2canvas y dompurify (~380 kB). Sólo se carga cuando
+// el usuario exporta un PDF, para que el arranque del CRM sea ligero.
+async function loadJsPdf() {
+  const { jsPDF } = await import("jspdf");
+  return jsPDF;
+}
+
 function getOpportunityScoreFromWebsite(websiteStatus) {
   if (websiteStatus === "No Website") return 95;
   if (websiteStatus === "Facebook Only") return 90;
@@ -291,6 +319,12 @@ export default function App() {
   const [followUpDate, setFollowUpDate] = useState("");
   const [activeView, setActiveView] = useState("dashboard");
   const [toasts, setToasts] = useState([]);
+  const [leadSearch, setLeadSearch] = useState("");
+  const [safeModeLimits, setSafeModeLimits] = useState(SAFE_MODE_CONFIG);
+  const [backendStatus, setBackendStatus] = useState({
+    state: "checking",
+    message: "Checking backend connection...",
+  });
 
   const notify = (message, tone = "info") => {
     const id = crypto.randomUUID();
@@ -308,7 +342,83 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.activityLog, JSON.stringify(activityLog));
   }, [activityLog]);
 
+  // El backend expone /api/health y /api/safe-mode. Los consultamos al
+  // arrancar para saber si el servidor responde y para usar SUS límites de
+  // Safe Mode en lugar de los valores por defecto del frontend.
+  const checkBackendConnection = async () => {
+    setBackendStatus({
+      state: "checking",
+      message: "Checking backend connection...",
+    });
+
+    try {
+      const response = await fetch(`${API_URL}/api/health`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setBackendStatus({
+          state: "offline",
+          message: data.message || "Backend responded with an error.",
+        });
+        return false;
+      }
+
+      setBackendStatus({
+        state: "online",
+        message: `Connected to ${API_URL}`,
+      });
+      return true;
+    } catch {
+      setBackendStatus({
+        state: "offline",
+        message: `No response from ${API_URL}. Run "npm run server".`,
+      });
+      return false;
+    }
+  };
+
+  const syncSafeModeLimits = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/safe-mode`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json();
+
+      if (response.ok && data.success && data.limits) {
+        setSafeModeLimits((currentLimits) => ({
+          ...currentLimits,
+          ...data.limits,
+        }));
+      }
+    } catch {
+      // Sin backend nos quedamos con los límites por defecto del frontend.
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrapBackend = async () => {
+      const isOnline = await checkBackendConnection();
+
+      if (!cancelled && isOnline) {
+        await syncSafeModeLimits();
+      }
+    };
+
+    bootstrapBackend();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const filteredLeads = useMemo(() => {
+    const searchTerm = leadSearch.trim().toLowerCase();
+
     return leads.filter((lead) => {
       const matchesCity =
         city === "All" || city === "All USA" || lead.city === city;
@@ -318,9 +428,29 @@ export default function App() {
       const leadQuality = getLeadQuality(lead);
       const matchesQuality = !hotLeadsOnly || leadQuality.level === "hot";
 
-      return matchesCity && matchesCategory && matchesWebsite && matchesQuality;
+      const matchesSearch =
+        !searchTerm ||
+        [
+          lead.name,
+          lead.email,
+          lead.phone,
+          lead.city,
+          lead.category,
+          lead.instagram,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(searchTerm);
+
+      return (
+        matchesCity &&
+        matchesCategory &&
+        matchesWebsite &&
+        matchesQuality &&
+        matchesSearch
+      );
     });
-  }, [leads, city, category, websiteStatus, hotLeadsOnly]);
+  }, [leads, city, category, websiteStatus, hotLeadsOnly, leadSearch]);
 
   const stats = useMemo(() => {
     return {
@@ -331,6 +461,97 @@ export default function App() {
       closed: leads.filter((lead) => lead.status === "Closed").length,
     };
   }, [leads]);
+
+  // Plan del día: agrupa los leads en las cinco acciones que realmente
+  // mueven el pipeline, para no tener que revisar la lista entera a mano.
+  const todayActionGroups = useMemo(() => {
+    const todayKey = getTodayDateKey();
+    const openLeads = leads.filter(isLeadStillOpen);
+
+    const overdue = openLeads.filter(
+      (lead) => lead.followUpDate && lead.followUpDate < todayKey
+    );
+
+    const dueToday = openLeads.filter(
+      (lead) => lead.followUpDate === todayKey
+    );
+
+    const hotToContact = openLeads
+      .filter(
+        (lead) =>
+          lead.status === "New" && getLeadQuality(lead).level === "hot"
+      )
+      .sort((a, b) => getLeadQuality(b).score - getLeadQuality(a).score);
+
+    const waitingReply = openLeads.filter(
+      (lead) =>
+        ["Contacted", "Interested"].includes(lead.status) &&
+        (!lead.followUpDate || lead.followUpDate < todayKey)
+    );
+
+    const proposalsToClose = openLeads.filter(
+      (lead) => lead.status === "Proposal Sent"
+    );
+
+    return [
+      {
+        id: "overdue",
+        icon: "⏰",
+        title: "Overdue follow-ups",
+        subtitle: "Past their date",
+        view: "pipeline",
+        emptyText: "Nothing overdue. Good job.",
+        tag: () => "Overdue",
+        leads: overdue,
+      },
+      {
+        id: "due-today",
+        icon: "📅",
+        title: "Due today",
+        subtitle: "Scheduled for today",
+        view: "pipeline",
+        emptyText: "No follow-ups scheduled for today.",
+        tag: () => "Today",
+        leads: dueToday,
+      },
+      {
+        id: "hot",
+        icon: "🔥",
+        title: "Hot leads to contact",
+        subtitle: "Still marked as New",
+        view: "messages",
+        emptyText: "No untouched hot leads. Search for more.",
+        tag: (lead) => `${getLeadQuality(lead).score}/100`,
+        leads: hotToContact,
+      },
+      {
+        id: "waiting",
+        icon: "💬",
+        title: "Waiting on reply",
+        subtitle: "Contacted, no follow-up set",
+        view: "pipeline",
+        emptyText: "Every contacted lead has a next step.",
+        tag: (lead) => lead.status,
+        leads: waitingReply,
+      },
+      {
+        id: "proposals",
+        icon: "📄",
+        title: "Proposals to close",
+        subtitle: "Proposal already sent",
+        view: "pipeline",
+        emptyText: "No open proposals yet.",
+        tag: () => "Close",
+        leads: proposalsToClose,
+      },
+    ];
+  }, [leads]);
+
+  const todayActionCount = useMemo(
+    () =>
+      todayActionGroups.reduce((total, group) => total + group.leads.length, 0),
+    [todayActionGroups]
+  );
 
   const addActivityLog = (businessName, action, channel = "system") => {
     const newLog = {
@@ -389,6 +610,11 @@ export default function App() {
     setOutreachMessage("");
     setLeadNoteText("");
     setFollowUpDate(lead.followUpDate || "");
+  };
+
+  const openLeadInView = (lead, view) => {
+    handleSelectLead(lead);
+    setActiveView(view);
   };
 
   const updateLeadStatus = (leadId, newStatus) => {
@@ -548,8 +774,8 @@ export default function App() {
 
     const searchLimit =
       searchCity === "All USA"
-        ? SAFE_MODE_CONFIG.allUsaNormalSearchLimit
-        : SAFE_MODE_CONFIG.normalSearchLimit;
+        ? safeModeLimits.allUsaNormalSearchLimit
+        : safeModeLimits.normalSearchLimit;
 
     setIsSearching(true);
 
@@ -581,7 +807,7 @@ export default function App() {
         return;
       }
 
-      const normalizedLeads = apiLeads.map((lead, index) => {
+      const normalizedLeads = apiLeads.map((lead) => {
         const normalizedWebsite = lead.website || "No Website";
 
         return {
@@ -681,7 +907,7 @@ export default function App() {
   };
 
   const normalizeApiLeads = (apiLeads, searchCity, searchCategory) => {
-    return apiLeads.map((lead, index) => {
+    return apiLeads.map((lead) => {
       const normalizedWebsite = lead.website || "No Website";
 
       return {
@@ -771,8 +997,8 @@ export default function App() {
     const searchCategory = category === "All" ? "Restaurant" : category;
     const enrichmentLimit =
       searchCity === "All USA"
-        ? SAFE_MODE_CONFIG.allUsaEmailLimit
-        : SAFE_MODE_CONFIG.singleCityEmailLimit;
+        ? safeModeLimits.allUsaEmailLimit
+        : safeModeLimits.singleCityEmailLimit;
 
     const confirmSearch = window.confirm(
       `SAFE MODE is ON. This will search real businesses and enrich up to ${enrichmentLimit} websites with email/social data. This can use Outscraper credits. Continue?`
@@ -1333,7 +1559,7 @@ ${generatedAudit}`;
     addActivityLog(selectedLead.name, `Audit exported as ${fileName}`, "export");
   };
 
-  const exportAuditPdf = () => {
+  const exportAuditPdf = async () => {
     if (!selectedLead) return;
 
     if (!generatedAudit) {
@@ -1342,7 +1568,16 @@ ${generatedAudit}`;
     }
 
     const fileName = `${createSafeFileName(selectedLead.name)}-audit.pdf`;
-    const doc = new jsPDF();
+    let JsPdf;
+
+    try {
+      JsPdf = await loadJsPdf();
+    } catch {
+      notify("Could not load the PDF export module.", "error");
+      return;
+    }
+
+    const doc = new JsPdf();
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -1405,7 +1640,7 @@ ${generatedAudit}`;
     );
   };
 
-  const createClientProposalPdf = () => {
+  const createClientProposalPdf = async () => {
     if (!selectedLead) {
       notify("Please select a lead first.");
       return;
@@ -1413,7 +1648,16 @@ ${generatedAudit}`;
 
     const fileName = `${createSafeFileName(selectedLead.name)}-proposal.pdf`;
     const leadQuality = getLeadQuality(selectedLead);
-    const doc = new jsPDF();
+    let JsPdf;
+
+    try {
+      JsPdf = await loadJsPdf();
+    } catch {
+      notify("Could not load the PDF export module.", "error");
+      return;
+    }
+
+    const doc = new JsPdf();
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -1747,7 +1991,7 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
         `${outreachTitle || "Outreach message"} copied`,
         "copy"
       );
-    } catch (error) {
+    } catch {
       notify("Could not copy the outreach message.");
     }
   };
@@ -1853,7 +2097,7 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
     try {
       await navigator.clipboard.writeText(contactMessage);
       notify("Message copied!", "success");
-    } catch (error) {
+    } catch {
       notify("Could not copy the message.");
     }
   };
@@ -2129,8 +2373,8 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
             <h2>{currentMeta.title}</h2>
             <p>{currentMeta.subtitle}</p>
             <div className="safe-mode-badge">
-              Safe Mode ON · City emails: {SAFE_MODE_CONFIG.singleCityEmailLimit}{" "}
-              · All USA emails: {SAFE_MODE_CONFIG.allUsaEmailLimit}
+              Safe Mode ON · City emails: {safeModeLimits.singleCityEmailLimit}{" "}
+              · All USA emails: {safeModeLimits.allUsaEmailLimit}
             </div>
           </div>
 
@@ -2153,6 +2397,72 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
         {/* ===================== DASHBOARD ===================== */}
         {activeView === "dashboard" && (
           <>
+            <section className="daily-dashboard">
+              <div className="daily-dashboard-header">
+                <div>
+                  <h3>Today's Action Plan</h3>
+                  <p>
+                    The leads that need you right now, grouped by what to do
+                    next.
+                  </p>
+                </div>
+                <span>
+                  {todayActionCount}{" "}
+                  {todayActionCount === 1 ? "action" : "actions"} pending
+                </span>
+              </div>
+
+              <div className="daily-action-grid">
+                {todayActionGroups.map((group) => (
+                  <div className="daily-action-card" key={group.id}>
+                    <div className="daily-action-card-header">
+                      <span aria-hidden="true">{group.icon}</span>
+                      <div>
+                        <strong>{group.title}</strong>
+                        <small>
+                          {group.leads.length} · {group.subtitle}
+                        </small>
+                      </div>
+                    </div>
+
+                    <div className="daily-action-list">
+                      {group.leads.length === 0 && <p>{group.emptyText}</p>}
+
+                      {group.leads.slice(0, 4).map((lead) => (
+                        <button
+                          type="button"
+                          key={lead.id}
+                          onClick={() => openLeadInView(lead, group.view)}
+                        >
+                          <span>
+                            <strong>{lead.name}</strong>
+                            <small>
+                              {lead.category} · {lead.city}
+                            </small>
+                          </span>
+                          <em>{group.tag(lead)}</em>
+                        </button>
+                      ))}
+
+                      {group.leads.length > 4 && (
+                        <button
+                          type="button"
+                          className="daily-more"
+                          onClick={() => setActiveView("leads")}
+                        >
+                          <span>
+                            <strong>
+                              +{group.leads.length - 4} more
+                            </strong>
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
             <section className="stats-grid">
               <StatCard title="Total Leads" value={stats.total} />
               <StatCard title="Hot Leads" value={stats.hotLeads} />
@@ -2353,8 +2663,32 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
               {leadFormCard}
 
               <div className="card" id="businesses">
-                <div className="card-header">
-                  <h3>{filteredLeads.length} Leads Found</h3>
+                <div className="card-header with-search">
+                  <h3>
+                    {filteredLeads.length}{" "}
+                    {filteredLeads.length === 1 ? "Lead" : "Leads"} Found
+                  </h3>
+                  {leadSearch && (
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => setLeadSearch("")}
+                    >
+                      Clear search
+                    </button>
+                  )}
+                </div>
+
+                <div className="filters lead-search-row">
+                  <label>
+                    Search
+                    <input
+                      type="search"
+                      value={leadSearch}
+                      onChange={(event) => setLeadSearch(event.target.value)}
+                      placeholder="Search by name, email, phone, city or category"
+                    />
+                  </label>
                 </div>
 
                 <div className="table">
@@ -2415,8 +2749,9 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
                   {filteredLeads.length === 0 && (
                     <div className="empty-state">
-                      No leads yet. Head to Search Leads to find businesses, or
-                      add one manually.
+                      {leads.length === 0
+                        ? "No leads yet. Head to Search Leads to find businesses, or add one manually."
+                        : "No leads match these filters. Try clearing the search or the filters in Search Leads."}
                     </div>
                   )}
                 </div>
@@ -2738,6 +3073,72 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                     </button>
                   </div>
                 </div>
+
+                <div className="card" id="outreach">
+                  <div className="card-header">
+                    <div>
+                      <h3>Outreach Sequence</h3>
+                      <p className="muted">
+                        Five ready-to-send steps for {selectedLead.name}. Pick
+                        one, copy it, and mark the lead as contacted.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="outreach-grid">
+                    {OUTREACH_STEPS.map((step) => (
+                      <button
+                        key={step.id}
+                        type="button"
+                        className={
+                          outreachTitle === step.label
+                            ? "primary-btn"
+                            : "secondary-btn"
+                        }
+                        onClick={() => generateOutreachSequence(step.id)}
+                      >
+                        {step.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {outreachMessage ? (
+                    <div className="outreach-preview">
+                      <div className="outreach-preview-header">
+                        <strong>{outreachTitle}</strong>
+                        <span>
+                          {getLeadQuality(selectedLead).emoji}{" "}
+                          {getLeadQuality(selectedLead).label}
+                        </span>
+                      </div>
+
+                      <p>{outreachMessage}</p>
+
+                      <div className="actions">
+                        <button
+                          className="secondary-btn"
+                          onClick={copyOutreachMessage}
+                        >
+                          <Copy size={16} />
+                          Copy Message
+                        </button>
+
+                        <button
+                          className="primary-btn"
+                          onClick={markOutreachContacted}
+                        >
+                          <Send size={16} />
+                          Mark as Contacted
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="empty-state">
+                      Pick a step above to generate a personalized message for
+                      this lead.
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               noLeadState
@@ -2925,6 +3326,57 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                 <button className="danger-btn full" onClick={clearSavedData}>
                   Reset All Data
                 </button>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3>Backend Connection</h3>
+              <p className="muted">
+                The Express server proxies every Outscraper call. Searching and
+                enrichment only work while it is running.
+              </p>
+
+              <div className={`backend-status ${backendStatus.state}`}>
+                <span className="backend-status-dot" aria-hidden="true" />
+                <span>
+                  {backendStatus.state === "online"
+                    ? "Online"
+                    : backendStatus.state === "offline"
+                    ? "Offline"
+                    : "Checking"}{" "}
+                  — {backendStatus.message}
+                </span>
+              </div>
+
+              <div className="lead-management-actions">
+                <button
+                  type="button"
+                  className="secondary-btn full"
+                  onClick={async () => {
+                    const isOnline = await checkBackendConnection();
+                    if (isOnline) {
+                      await syncSafeModeLimits();
+                      notify("Backend connected.", "success");
+                    } else {
+                      notify("Backend is not responding.", "error");
+                    }
+                  }}
+                  disabled={backendStatus.state === "checking"}
+                >
+                  {backendStatus.state === "checking"
+                    ? "Checking..."
+                    : "Test Connection"}
+                </button>
+              </div>
+
+              <div className="backend-status">
+                <span>
+                  Safe Mode limits in use — city emails:{" "}
+                  {safeModeLimits.singleCityEmailLimit} · All USA emails:{" "}
+                  {safeModeLimits.allUsaEmailLimit} · city search:{" "}
+                  {safeModeLimits.normalSearchLimit} · All USA search:{" "}
+                  {safeModeLimits.allUsaNormalSearchLimit}
+                </span>
               </div>
             </div>
 

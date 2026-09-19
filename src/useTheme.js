@@ -14,7 +14,7 @@ function getInitialTheme() {
     if (saved === "light" || saved === "dark") {
       return saved;
     }
-  } catch (error) {
+  } catch {
     // Si localStorage falla, usamos el default.
   }
 
@@ -38,7 +38,7 @@ export function useTheme() {
 
     try {
       localStorage.setItem(THEME_KEY, theme);
-    } catch (error) {
+    } catch {
       // Si falla el guardado, no rompemos la app.
     }
   }, [theme]);
