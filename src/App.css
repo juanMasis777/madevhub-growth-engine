@@ -547,6 +547,7 @@ a {
 }
 
 .filters select,
+.filters input,
 .form-grid input,
 .form-grid select {
   width: 100%;
@@ -561,6 +562,7 @@ a {
 }
 
 .filters select:focus,
+.filters input:focus,
 .form-grid input:focus,
 .form-grid select:focus {
   border-color: var(--blue);
@@ -2336,4 +2338,56 @@ a {
   .toast {
     animation: none;
   }
+}
+
+
+/* =========================================================
+   LEAD SEARCH + BACKEND STATUS
+   ========================================================= */
+
+.lead-search-row {
+  grid-template-columns: 1fr;
+  margin-bottom: 16px;
+}
+
+.card-header.with-search {
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.backend-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 16px;
+  border-radius: var(--radius-md);
+  padding: 13px 15px;
+  background: var(--surface-inset);
+  border: 1px solid var(--inset-border);
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.backend-status-dot {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--muted);
+}
+
+.backend-status.online .backend-status-dot {
+  background: var(--green);
+}
+
+.backend-status.offline .backend-status-dot {
+  background: var(--danger);
+}
+
+.backend-status.checking .backend-status-dot {
+  background: var(--blue);
 }

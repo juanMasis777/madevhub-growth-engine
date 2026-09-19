@@ -71,6 +71,8 @@ npm run dev          # solo frontend
 | `npm run dev`     | Frontend Vite con HMR                          |
 | `npm run server`  | Backend Express                                |
 | `npm run dev:all` | Backend + frontend simultáneos (concurrently)  |
+| `npm run lint`    | Oxlint sobre todo el proyecto                  |
+| `npm run lint:fix`| Oxlint aplicando las correcciones automáticas  |
 | `npm run build`   | Build de producción del frontend               |
 | `npm run preview` | Sirve el build de producción localmente        |
 
@@ -83,14 +85,46 @@ madevhub-growth-engine/
 ├── server/
 │   └── index.js        # API Express: proxy seguro a Outscraper
 ├── src/
-│   ├── App.jsx         # Aplicación React (CRM)
+│   ├── App.jsx         # Aplicación React (CRM completo, 7 vistas)
 │   ├── App.css         # Sistema de diseño (glass premium, claro/oscuro)
 │   ├── index.css       # Estilos base globales
-│   ├── useTheme.js     # Hook de tema claro/oscuro
-│   └── data/           # Datos mock de ejemplo
+│   └── useTheme.js     # Hook de tema claro/oscuro
 ├── public/             # Assets estáticos
 └── .env.example        # Plantilla de variables de entorno
 ```
+
+### Vistas de la app
+
+| Vista             | Qué hace                                                                 |
+| ----------------- | ------------------------------------------------------------------------ |
+| **Dashboard**     | *Today's Action Plan* + métricas, pipeline y log de actividad             |
+| **Search Leads**  | Búsqueda en Google Maps con Safe Mode y alta manual de leads              |
+| **Businesses**    | Lista completa con buscador por nombre, email, teléfono, ciudad o rubro   |
+| **Audits**        | Auditoría de presencia digital, enriquecimiento y export TXT/PDF/propuesta|
+| **Messages**      | Mensaje por canal (email/IG/llamada) + secuencia de outreach de 5 pasos   |
+| **Pipeline**      | Estado del lead, fecha de seguimiento y notas                             |
+| **Settings**      | Editar/borrar lead, backup, estado del backend y tema claro/oscuro        |
+
+#### Today's Action Plan
+
+El dashboard agrupa automáticamente los leads en las cinco acciones que mueven
+el pipeline, para no revisar la lista entera a mano:
+
+1. **Overdue follow-ups** — seguimientos con fecha pasada.
+2. **Due today** — seguimientos agendados para hoy.
+3. **Hot leads to contact** — leads calientes que siguen en `New`.
+4. **Waiting on reply** — contactados o interesados sin próximo paso agendado.
+5. **Proposals to close** — propuestas ya enviadas.
+
+Cada tarjeta lleva directo al lead en la vista correcta. Los leads en `Closed`
+o `Lost` quedan fuera del plan.
+
+#### Secuencia de outreach
+
+En **Messages** hay cinco plantillas personalizadas con los datos reales del
+lead (nombre, ciudad, rubro, rating, reseñas y estado de su web): *Initial
+Email*, *Instagram DM*, *Follow-up 1*, *Follow-up 2* y *Call Script*. Se copian
+al portapapeles y marcan el lead como `Contacted` en un clic.
 
 ### Endpoints del backend
 
@@ -132,3 +166,16 @@ Los leads se guardan en el `localStorage` del navegador. Usa los botones
 **Export Backup** / **Import Backup** de la interfaz para mover tus datos entre
 navegadores o dispositivos, y **Export CSV** para llevarlos a otras
 herramientas.
+
+En **Settings → Backend Connection** puedes comprobar si el servidor Express
+responde (`/api/health`) y ver los límites de Safe Mode que el backend está
+aplicando de verdad (`/api/safe-mode`), en lugar de los valores por defecto del
+frontend.
+
+---
+
+## Rendimiento
+
+`jspdf` (y sus dependencias `html2canvas` + `dompurify`, ~380 kB) se carga de
+forma diferida, solo cuando exportas un PDF. El bundle inicial del CRM queda en
+torno a 255 kB (78 kB gzip).
