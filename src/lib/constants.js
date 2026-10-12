@@ -4,6 +4,7 @@
 // ============================================================
 
 export const STORAGE_KEYS = {
+  demoSeeded: "madevhub_growth_engine_demo_seeded",
   leads: "madevhub_growth_engine_leads",
   activityLog: "madevhub_growth_engine_activity_log",
 };

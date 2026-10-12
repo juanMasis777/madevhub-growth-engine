@@ -27,27 +27,26 @@ import {
   convertLeadToForm,
   createSafeFileName,
   getTodayDateKey,
-  isLeadStillOpen,
   getOpportunityScoreFromWebsite,
   getLeadQuality,
 } from "./lib/leads.js";
-import { loadFromLocalStorage } from "./lib/storage.js";
+import { buildTodayActionGroups } from "./lib/actionPlan.js";
+import { loadFromLocalStorage, loadInitialLeads } from "./lib/storage.js";
+import { isDemoLead } from "./lib/demoLeads.js";
 import { API_URL, authHeaders } from "./lib/api.js";
 import { loadJsPdf } from "./lib/pdf.js";
 import "./App.css";
-
-const INITIAL_LEADS = [];
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
   const backupFileInputRef = useRef(null);
 
   const [leads, setLeads] = useState(() =>
-    loadFromLocalStorage(STORAGE_KEYS.leads, INITIAL_LEADS)
+    loadInitialLeads()
   );
 
   const [selectedLead, setSelectedLead] = useState(() => {
-    const savedLeads = loadFromLocalStorage(STORAGE_KEYS.leads, INITIAL_LEADS);
+    const savedLeads = loadInitialLeads();
     return savedLeads[0] || null;
   });
 
@@ -57,7 +56,7 @@ export default function App() {
   const [hotLeadsOnly, setHotLeadsOnly] = useState(false);
 
   const [contactMode, setContactMode] = useState(() => {
-    const savedLeads = loadFromLocalStorage(STORAGE_KEYS.leads, INITIAL_LEADS);
+    const savedLeads = loadInitialLeads();
     return getDefaultContactMode(savedLeads[0]);
   });
 
@@ -223,88 +222,17 @@ export default function App() {
 
   // Plan del día: agrupa los leads en las cinco acciones que realmente
   // mueven el pipeline, para no tener que revisar la lista entera a mano.
-  const todayActionGroups = useMemo(() => {
-    const todayKey = getTodayDateKey();
-    const openLeads = leads.filter(isLeadStillOpen);
+  const todayActionGroups = useMemo(
+    () => buildTodayActionGroups(leads, getTodayDateKey()),
+    [leads]
+  );
 
-    const overdue = openLeads.filter(
-      (lead) => lead.followUpDate && lead.followUpDate < todayKey
-    );
-
-    const dueToday = openLeads.filter(
-      (lead) => lead.followUpDate === todayKey
-    );
-
-    const hotToContact = openLeads
-      .filter(
-        (lead) =>
-          lead.status === "New" && getLeadQuality(lead).level === "hot"
-      )
-      .sort((a, b) => getLeadQuality(b).score - getLeadQuality(a).score);
-
-    const waitingReply = openLeads.filter(
-      (lead) =>
-        ["Contacted", "Interested"].includes(lead.status) &&
-        (!lead.followUpDate || lead.followUpDate < todayKey)
-    );
-
-    const proposalsToClose = openLeads.filter(
-      (lead) => lead.status === "Proposal Sent"
-    );
-
-    return [
-      {
-        id: "overdue",
-        icon: "⏰",
-        title: "Overdue follow-ups",
-        subtitle: "Past their date",
-        view: "pipeline",
-        emptyText: "Nothing overdue. Good job.",
-        tag: () => "Overdue",
-        leads: overdue,
-      },
-      {
-        id: "due-today",
-        icon: "📅",
-        title: "Due today",
-        subtitle: "Scheduled for today",
-        view: "pipeline",
-        emptyText: "No follow-ups scheduled for today.",
-        tag: () => "Today",
-        leads: dueToday,
-      },
-      {
-        id: "hot",
-        icon: "🔥",
-        title: "Hot leads to contact",
-        subtitle: "Still marked as New",
-        view: "messages",
-        emptyText: "No untouched hot leads. Search for more.",
-        tag: (lead) => `${getLeadQuality(lead).score}/100`,
-        leads: hotToContact,
-      },
-      {
-        id: "waiting",
-        icon: "💬",
-        title: "Waiting on reply",
-        subtitle: "Contacted, no follow-up set",
-        view: "pipeline",
-        emptyText: "Every contacted lead has a next step.",
-        tag: (lead) => lead.status,
-        leads: waitingReply,
-      },
-      {
-        id: "proposals",
-        icon: "📄",
-        title: "Proposals to close",
-        subtitle: "Proposal already sent",
-        view: "pipeline",
-        emptyText: "No open proposals yet.",
-        tag: () => "Close",
-        leads: proposalsToClose,
-      },
-    ];
-  }, [leads]);
+  // The sample pipeline that ships with the public demo. Shown as a banner
+  // so nobody mistakes these for real leads they scraped.
+  const demoLeadCount = useMemo(
+    () => leads.filter(isDemoLead).length,
+    [leads]
+  );
 
   const todayActionCount = useMemo(
     () =>
@@ -416,6 +344,24 @@ export default function App() {
       top: 0,
       behavior: "smooth",
     });
+  };
+
+  const clearDemoLeads = () => {
+    const realLeads = leads.filter((lead) => !isDemoLead(lead));
+
+    setLeads(realLeads);
+
+    const nextSelectedLead = realLeads[0] || null;
+    setSelectedLead(nextSelectedLead);
+    setContactMode(getDefaultContactMode(nextSelectedLead));
+    setGeneratedAudit("");
+    setOutreachTitle("");
+    setOutreachMessage("");
+    setLeadNoteText("");
+    setFollowUpDate(nextSelectedLead?.followUpDate || "");
+    resetLeadForm();
+
+    notify("Demo leads removed. The CRM is yours now.", "success");
   };
 
   const deleteSelectedLead = () => {
@@ -1155,7 +1101,7 @@ export default function App() {
     localStorage.removeItem(STORAGE_KEYS.leads);
     localStorage.removeItem(STORAGE_KEYS.activityLog);
 
-    setLeads(INITIAL_LEADS);
+    setLeads([]);
     setSelectedLead(null);
     setContactMode("call");
     setActivityLog([]);
@@ -2150,6 +2096,26 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
             </button>
           </div>
         </header>
+
+        {demoLeadCount > 0 && (
+          <div className="demo-banner" role="status">
+            <div className="demo-banner-text">
+              <strong>Demo data</strong>
+              <span>
+                {demoLeadCount} sample {demoLeadCount === 1 ? "lead" : "leads"}{" "}
+                are loaded so you can try the CRM right away. Searching real
+                businesses needs the backend running with your Outscraper key.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={clearDemoLeads}
+            >
+              Clear demo data
+            </button>
+          </div>
+        )}
 
         {/* ===================== DASHBOARD ===================== */}
         {activeView === "dashboard" && (
