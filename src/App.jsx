@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  LayoutDashboard,
-  Search,
   Building2,
   Mail,
-  Settings,
-  BarChart3,
-  Sparkles,
   Send,
   MessageCircle,
   Phone,
@@ -16,268 +11,32 @@ import {
   Moon,
 } from "lucide-react";
 import { useTheme } from "./useTheme";
+import {
+  STORAGE_KEYS,
+  SAFE_MODE_CONFIG,
+  CITY_OPTIONS,
+  VIEW_META,
+  PIPELINE_STAGES,
+  emptyLeadForm,
+  OUTREACH_STEPS,
+} from "./lib/constants.js";
+import { NAV_ITEMS } from "./lib/navigation.js";
+import {
+  getDefaultContactMode,
+  getActionLabel,
+  convertLeadToForm,
+  createSafeFileName,
+  getTodayDateKey,
+  isLeadStillOpen,
+  getOpportunityScoreFromWebsite,
+  getLeadQuality,
+} from "./lib/leads.js";
+import { loadFromLocalStorage } from "./lib/storage.js";
+import { API_URL, authHeaders } from "./lib/api.js";
+import { loadJsPdf } from "./lib/pdf.js";
 import "./App.css";
 
-const STORAGE_KEYS = {
-  leads: "madevhub_growth_engine_leads",
-  activityLog: "madevhub_growth_engine_activity_log",
-};
-
 const INITIAL_LEADS = [];
-
-const SAFE_MODE_CONFIG = {
-  enabled: true,
-  singleCityEmailLimit: 3,
-  allUsaEmailLimit: 5,
-  normalSearchLimit: 8,
-  allUsaNormalSearchLimit: 12,
-};
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
-const API_ACCESS_TOKEN = import.meta.env.VITE_API_ACCESS_TOKEN || "";
-
-// Cabeceras con el token de acceso (si está configurado en el .env).
-const authHeaders = () =>
-  API_ACCESS_TOKEN ? { "x-access-token": API_ACCESS_TOKEN } : {};
-
-const CITY_OPTIONS = [
-  "Miami",
-  "All USA",
-  "Orlando",
-  "Tampa",
-  "Atlanta",
-  "Dallas",
-  "Houston",
-  "Austin",
-  "New York",
-  "Los Angeles",
-  "Chicago",
-  "Phoenix",
-  "Las Vegas",
-  "Denver",
-  "Seattle",
-  "Boston",
-  "San Diego",
-  "Nashville",
-  "Charlotte",
-  "Raleigh",
-  "Washington DC",
-];
-
-const NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "search", label: "Search Leads", icon: Search },
-  { id: "leads", label: "Businesses", icon: Building2 },
-  { id: "audits", label: "Audits", icon: Sparkles },
-  { id: "messages", label: "Messages", icon: Mail },
-  { id: "pipeline", label: "Pipeline", icon: BarChart3 },
-  { id: "settings", label: "Settings", icon: Settings },
-];
-
-const VIEW_META = {
-  dashboard: {
-    title: "Welcome back, Juan 👋",
-    subtitle: "Find local businesses that need websites and automation.",
-  },
-  search: {
-    title: "Search Leads",
-    subtitle: "Discover businesses with weak online presence, ready to close.",
-  },
-  leads: {
-    title: "Businesses",
-    subtitle: "Your full lead list. Select a business to work it.",
-  },
-  audits: {
-    title: "AI Audits",
-    subtitle: "Generate a digital-presence audit and proposal.",
-  },
-  messages: {
-    title: "Outreach",
-    subtitle: "Craft and send the perfect first message.",
-  },
-  pipeline: {
-    title: "Pipeline",
-    subtitle: "Move leads from New to Closed and track follow-ups.",
-  },
-  settings: {
-    title: "Settings",
-    subtitle: "Manage this lead, your data, and app preferences.",
-  },
-};
-
-const PIPELINE_STAGES = [
-  "New",
-  "Contacted",
-  "Interested",
-  "Proposal Sent",
-  "Closed",
-  "Lost",
-];
-
-const emptyLeadForm = {
-  name: "",
-  city: "Miami",
-  category: "Barbershop",
-  website: "No Website",
-  phone: "",
-  email: "",
-  instagram: "",
-  rating: "4.5",
-  reviews: "0",
-  opportunityScore: "90",
-};
-
-function loadFromLocalStorage(key, fallbackValue) {
-  try {
-    const savedData = localStorage.getItem(key);
-    return savedData ? JSON.parse(savedData) : fallbackValue;
-  } catch (error) {
-    console.error("Error loading from localStorage:", error);
-    return fallbackValue;
-  }
-}
-
-function getDefaultContactMode(lead) {
-  if (lead?.email) return "email";
-  if (lead?.instagram) return "instagram";
-  return "call";
-}
-
-function getActionLabel(contactMode) {
-  if (contactMode === "email") return "Send Email";
-  if (contactMode === "instagram") return "Copy Instagram DM";
-  return "Save Call Script";
-}
-
-function convertLeadToForm(lead) {
-  return {
-    name: lead.name || "",
-    city: lead.city || "Miami",
-    category: lead.category || "Barbershop",
-    website: lead.website || "No Website",
-    phone: lead.phone || "",
-    email: lead.email || "",
-    instagram: lead.instagram || "",
-    rating: String(lead.rating ?? "4.5"),
-    reviews: String(lead.reviews ?? "0"),
-    opportunityScore: String(lead.opportunityScore ?? "90"),
-  };
-}
-
-function createSafeFileName(name) {
-  return (
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/gi, "-")
-      .replace(/^-+|-+$/g, "") || "business"
-  );
-}
-
-const OUTREACH_STEPS = [
-  { id: "email", label: "Initial Email" },
-  { id: "instagram", label: "Instagram DM" },
-  { id: "followup1", label: "Follow-up 1" },
-  { id: "followup2", label: "Follow-up 2" },
-  { id: "call", label: "Call Script" },
-];
-
-const CLOSED_STATUSES = ["Closed", "Lost"];
-
-function getTodayDateKey() {
-  const today = new Date();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-
-  return `${today.getFullYear()}-${month}-${day}`;
-}
-
-function isLeadStillOpen(lead) {
-  return !CLOSED_STATUSES.includes(lead?.status);
-}
-
-// jsPDF arrastra html2canvas y dompurify (~380 kB). Sólo se carga cuando
-// el usuario exporta un PDF, para que el arranque del CRM sea ligero.
-async function loadJsPdf() {
-  const { jsPDF } = await import("jspdf");
-  return jsPDF;
-}
-
-function getOpportunityScoreFromWebsite(websiteStatus) {
-  if (websiteStatus === "No Website") return 95;
-  if (websiteStatus === "Facebook Only") return 90;
-  if (websiteStatus === "Old Website") return 82;
-  return 70;
-}
-
-function getLeadQuality(lead) {
-  if (!lead) {
-    return {
-      score: 0,
-      label: "Low Priority",
-      emoji: "❄️",
-      level: "low",
-      className: "low",
-    };
-  }
-
-  let score = 0;
-
-  const opportunityScore = Number(lead.opportunityScore) || 0;
-  const rating = Number(lead.rating) || 0;
-  const reviews = Number(lead.reviews) || 0;
-
-  if (opportunityScore >= 90) score += 25;
-  else if (opportunityScore >= 80) score += 18;
-  else if (opportunityScore >= 70) score += 10;
-
-  if (lead.email) score += 25;
-  if (lead.phone) score += 15;
-  if (lead.instagram) score += 10;
-  if (lead.googleMapsUrl) score += 5;
-
-  if (reviews >= 200) score += 15;
-  else if (reviews >= 75) score += 10;
-  else if (reviews >= 25) score += 6;
-
-  if (rating >= 4.7) score += 10;
-  else if (rating >= 4.3) score += 7;
-  else if (rating >= 4.0) score += 4;
-
-  if (lead.website === "No Website") score += 15;
-  else if (lead.website === "Facebook Only") score += 12;
-  else if (lead.website === "Old Website") score += 10;
-  else if (lead.website === "Has Website") score += 4;
-
-  const finalScore = Math.min(score, 100);
-
-  if (finalScore >= 75) {
-    return {
-      score: finalScore,
-      label: "Hot Lead",
-      emoji: "🔥",
-      level: "hot",
-      className: "hot",
-    };
-  }
-
-  if (finalScore >= 50) {
-    return {
-      score: finalScore,
-      label: "Good Lead",
-      emoji: "⭐",
-      level: "good",
-      className: "good",
-    };
-  }
-
-  return {
-    score: finalScore,
-    label: "Low Priority",
-    emoji: "❄️",
-    level: "low",
-    className: "low",
-  };
-}
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
@@ -1386,7 +1145,6 @@ export default function App() {
     reader.readAsText(file);
   };
 
-
   const clearSavedData = () => {
     const confirmClear = window.confirm(
       "Are you sure you want to reset all saved leads and activity logs?"
@@ -2089,7 +1847,6 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
     notify(`${selectedLead.name} marked as Proposal Sent.`);
   };
-
 
   const contactMessage = generateContactMessage();
 
