@@ -20,6 +20,12 @@ import { buildTodayActionGroups } from "./lib/actionPlan.js";
 import { loadFromLocalStorage, loadInitialLeads } from "./lib/storage.js";
 import { isDemoLead } from "./lib/demoLeads.js";
 import { API_URL, authHeaders } from "./lib/api.js";
+import {
+  buildAudit,
+  buildContactMessage,
+  buildOutreachMessages,
+} from "./lib/templates.js";
+import { leadsToCsv, downloadTextFile } from "./lib/exports.js";
 import { loadJsPdf } from "./lib/pdf.js";
 import Sidebar from "./components/Sidebar.jsx";
 import Topbar from "./components/Topbar.jsx";
@@ -760,75 +766,7 @@ export default function App() {
       return;
     }
 
-    const headers = [
-      "Business",
-      "City",
-      "Category",
-      "Website Status",
-      "Website URL",
-      "Phone",
-      "Email",
-      "Instagram",
-      "Facebook",
-      "LinkedIn",
-      "Rating",
-      "Reviews",
-      "Opportunity Score",
-      "Status",
-      "Follow-up Date",
-      "Proposal Sent Date",
-      "Notes",
-      "Address",
-      "Google Maps",
-    ];
-
-    const escapeCsvValue = (value) => {
-      const safeValue = String(value ?? "");
-      return `"${safeValue.replace(/"/g, '""')}"`;
-    };
-
-    const rows = leads.map((lead) => [
-      lead.name,
-      lead.city,
-      lead.category,
-      lead.website,
-      lead.websiteUrl,
-      lead.phone,
-      lead.email,
-      lead.instagram,
-      lead.facebook,
-      lead.linkedin,
-      lead.rating,
-      lead.reviews,
-      lead.opportunityScore,
-      lead.status,
-      lead.followUpDate,
-      lead.proposalSentDate,
-      Array.isArray(lead.notes)
-        ? lead.notes.map((note) => `${note.date}: ${note.text}`).join(" | ")
-        : "",
-      lead.address,
-      lead.googleMapsUrl,
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map(escapeCsvValue).join(","))
-      .join("\n");
-
-    const blob = new Blob([csvContent], {
-      type: "text/csv;charset=utf-8",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const downloadLink = document.createElement("a");
-
-    downloadLink.href = url;
-    downloadLink.download = "madevhub-leads.csv";
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-
-    document.body.removeChild(downloadLink);
-    URL.revokeObjectURL(url);
+    downloadTextFile(leadsToCsv(leads), "madevhub-leads.csv", "text/csv");
 
     addActivityLog("Export Leads", "Leads exported as CSV", "export");
   };
@@ -1114,114 +1052,13 @@ export default function App() {
     resetLeadForm();
   };
 
-  const generateContactMessage = () => {
-    if (!selectedLead) return "";
-
-    if (contactMode === "email") {
-      return `Subject: Quick idea for ${selectedLead.name}
-
-Hi ${selectedLead.name},
-
-I found your business online and noticed that your digital presence could be improved. You already have a strong reputation with ${selectedLead.rating} stars and ${selectedLead.reviews} reviews, but I noticed your website status is: ${selectedLead.website}.
-
-At MADEVHUB, we help local businesses get professional websites, better visibility, and more customers.
-
-Would you like me to send you a free digital audit for your business?
-
-Best,
-Juan
-MADEVHUB`;
-    }
-
-    if (contactMode === "instagram") {
-      return `Hi ${selectedLead.name}, I found your business online and noticed you have a strong local presence with ${selectedLead.rating} stars and ${selectedLead.reviews} reviews.
-
-I also noticed your website status is: ${selectedLead.website}.
-
-I help local businesses get professional websites and attract more customers online. Would you like me to send you a free quick digital audit?`;
-    }
-
-    return `Call Script for ${selectedLead.name}
-
-Hi, my name is Juan from MADEVHUB. I found your business online and noticed you have great reviews.
-
-I help local businesses improve their online presence with professional websites, better visibility, and simple automation.
-
-I wanted to ask if you already have someone helping you with your website or online presence?
-
-If not, I can send you a free digital audit showing a few ways your business could attract more local customers.`;
-  };
+  const generateContactMessage = () =>
+    buildContactMessage(selectedLead, contactMode);
 
   const generateAudit = () => {
     if (!selectedLead) return;
 
-    const websiteProblem =
-      selectedLead.website === "No Website"
-        ? "The business does not have a professional website."
-        : selectedLead.website === "Old Website"
-        ? "The business may have an outdated website that needs improvement."
-        : selectedLead.website === "Facebook Only"
-        ? "The business depends mostly on Facebook instead of having a professional website."
-        : "The business has a website, but it can still improve its online presence.";
-
-    const contactProblem = selectedLead.email
-      ? "The business has an email available, so email outreach is possible."
-      : selectedLead.instagram
-      ? "No public email was found, but Instagram and phone outreach are possible."
-      : "No public email or Instagram was found, so phone outreach may be the best option.";
-
-    const addressInfo = selectedLead.address
-      ? `Address: ${selectedLead.address}`
-      : "Address: Not found";
-
-    const websiteInfo = selectedLead.websiteUrl
-      ? `Website URL: ${selectedLead.websiteUrl}`
-      : "Website URL: Not found";
-
-    const googleMapsInfo = selectedLead.googleMapsUrl
-      ? `Google Maps: ${selectedLead.googleMapsUrl}`
-      : "Google Maps: Not found";
-
-    const audit = `Digital Presence Audit for ${selectedLead.name}
-
-Business Type: ${selectedLead.category}
-Location: ${selectedLead.city}
-${addressInfo}
-${websiteInfo}
-${googleMapsInfo}
-Rating: ${selectedLead.rating} stars
-Reviews: ${selectedLead.reviews}
-Opportunity Score: ${selectedLead.opportunityScore}%
-Lead Quality: ${getLeadQuality(selectedLead).emoji} ${getLeadQuality(selectedLead).label} (${getLeadQuality(selectedLead).score}/100)
-Follow-up: ${selectedLead.followUpDate || "Not scheduled"}
-
-Main Problems Found:
-1. ${websiteProblem}
-2. ${contactProblem}
-3. The business may be missing a stronger online sales system.
-4. There is an opportunity to improve trust, booking, and local visibility.
-5. The business could convert more visitors with a better call-to-action.
-
-Recommended Improvements:
-1. Create a modern professional website.
-2. Add a clear call-to-action such as "Book Now", "Call Now", or "Get a Quote".
-3. Add services, prices, location, photos, and customer reviews.
-4. Add a contact form connected to email.
-5. Improve local SEO for customers searching in ${selectedLead.city}.
-6. Add simple automation for follow-ups, appointments, or quotes.
-
-MADEVHUB Opportunity:
-This business could benefit from a professional landing page, mobile-friendly design, local SEO setup, and simple automation to help convert visitors into customers.
-
-Suggested Offer:
-Website Setup: $299 - $799
-Monthly Maintenance: $49 - $149/month
-Optional SEO / Automation: $99 - $299/month
-
-Next Step:
-Send a personalized message offering a free digital audit and a quick website improvement idea.`;
-
-    setGeneratedAudit(audit);
+    setGeneratedAudit(buildAudit(selectedLead));
     addActivityLog(selectedLead.name, "Digital audit generated", "audit");
   };
 
@@ -1564,115 +1401,18 @@ Websites • Local SEO • Automation • Digital Growth`
   const generateOutreachSequence = (type) => {
     if (!selectedLead) return;
 
-    const leadQuality = getLeadQuality(selectedLead);
-    const businessName = selectedLead.name;
-    const cityName = selectedLead.city || "your area";
-    const businessCategory = selectedLead.category || "business";
-    const ratingText = selectedLead.rating
-      ? `${selectedLead.rating} stars`
-      : "strong local presence";
-    const reviewsText = selectedLead.reviews
-      ? `${selectedLead.reviews} reviews`
-      : "customer reviews";
+    const selectedMessage = buildOutreachMessages(selectedLead)[type];
 
-    const websiteObservation =
-      selectedLead.website === "No Website"
-        ? "I noticed your business may not have a professional website yet."
-        : selectedLead.website === "Old Website"
-        ? "I noticed your website may be due for a more modern and conversion-focused upgrade."
-        : selectedLead.website === "Facebook Only"
-        ? "I noticed your business may be relying heavily on Facebook instead of a dedicated website."
-        : "I noticed there may be room to improve your website conversion and local visibility.";
-
-    const messages = {
-      email: {
-        title: "Initial Email",
-        body: `Subject: Quick digital growth idea for ${businessName}
-
-Hi ${businessName},
-
-I found your business online while looking at ${businessCategory} businesses in ${cityName}. You already have a strong reputation with ${ratingText} and ${reviewsText}.
-
-${websiteObservation}
-
-At MADEVHUB, we help local businesses improve their website, local SEO, and lead capture so more visitors become real customers.
-
-I prepared a quick digital growth idea for your business.
-
-Would you like me to send it over?
-
-Best,
-Juan
-MADEVHUB`,
-      },
-
-      instagram: {
-        title: "Instagram DM",
-        body: `Hi ${businessName}, I found your business online and noticed you have a strong local presence in ${cityName}.
-
-${websiteObservation}
-
-I help local businesses get better websites, stronger local visibility, and more customer inquiries online.
-
-I prepared a quick digital growth idea for your business. Would you like me to send it over?`,
-      },
-
-      followup1: {
-        title: "Follow-up 1",
-        body: `Hi ${businessName},
-
-Just wanted to follow up on my previous message.
-
-I noticed a few simple improvements that could help your online presence convert more visitors into customers, especially for people searching for ${businessCategory} services in ${cityName}.
-
-I can send you the quick audit idea if you would like to see it.
-
-Best,
-Juan
-MADEVHUB`,
-      },
-
-      followup2: {
-        title: "Follow-up 2",
-        body: `Hi ${businessName},
-
-Last quick follow-up from me.
-
-I know you are probably busy, so I will keep it simple: I found a few opportunities to improve trust, visibility, and lead capture for your business online.
-
-No pressure — I can send the quick idea over if it is useful.
-
-Best,
-Juan
-MADEVHUB`,
-      },
-
-      call: {
-        title: "Call Script",
-        body: `Call Script for ${businessName}
-
-Hi, my name is Juan from MADEVHUB.
-
-I found your business online and noticed you have a strong reputation with ${ratingText} and ${reviewsText}.
-
-The reason for my call is that I help local businesses improve their website, local visibility, and lead capture system.
-
-I noticed one quick opportunity: ${websiteObservation}
-
-I wanted to ask: do you currently have someone helping you with your website or online marketing?
-
-If not, I can send you a free quick digital audit with a few improvement ideas.`,
-      },
-    };
-
-    const selectedMessage = messages[type];
+    if (!selectedMessage) return;
 
     setOutreachTitle(selectedMessage.title);
     setOutreachMessage(selectedMessage.body);
 
     addActivityLog(
-      businessName,
-      `${selectedMessage.title} generated. Lead quality: ${leadQuality.label}`,
+      selectedLead.name,
+      `${selectedMessage.title} generated. Lead quality: ${
+        getLeadQuality(selectedLead).label
+      }`,
       "outreach"
     );
   };
