@@ -2391,3 +2391,55 @@ a {
 .backend-status.checking .backend-status-dot {
   background: var(--blue);
 }
+
+/* ===================== DEMO BANNER =====================
+   Shown while the sample pipeline is loaded, so a first-time visitor
+   knows these leads are examples and can clear them in one click. */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: rgba(79, 99, 255, 0.10);
+  border: 1px solid rgba(79, 99, 255, 0.26);
+}
+
+.demo-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 240px;
+  flex: 1;
+}
+
+.demo-banner-text strong {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.demo-banner-text span {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.demo-banner .secondary-btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .demo-banner {
+    align-items: stretch;
+  }
+
+  .demo-banner .secondary-btn {
+    width: 100%;
+  }
+}

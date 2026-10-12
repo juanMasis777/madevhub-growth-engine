@@ -1,294 +1,55 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  LayoutDashboard,
-  Search,
-  Building2,
-  Mail,
-  Settings,
-  BarChart3,
-  Sparkles,
-  Send,
-  MessageCircle,
-  Phone,
-  Copy,
-  Clock,
-  Sun,
-  Moon,
-} from "lucide-react";
+import { Building2 } from "lucide-react";
 import { useTheme } from "./useTheme";
+import {
+  STORAGE_KEYS,
+  SAFE_MODE_CONFIG,
+  VIEW_META,
+  PIPELINE_STAGES,
+  emptyLeadForm,
+} from "./lib/constants.js";
+import {
+  getDefaultContactMode,
+  convertLeadToForm,
+  createSafeFileName,
+  getTodayDateKey,
+  getOpportunityScoreFromWebsite,
+  getLeadQuality,
+} from "./lib/leads.js";
+import { buildTodayActionGroups } from "./lib/actionPlan.js";
+import { loadFromLocalStorage, loadInitialLeads } from "./lib/storage.js";
+import { isDemoLead } from "./lib/demoLeads.js";
+import { API_URL, authHeaders } from "./lib/api.js";
+import {
+  buildAudit,
+  buildContactMessage,
+  buildOutreachMessages,
+} from "./lib/templates.js";
+import { leadsToCsv, downloadTextFile } from "./lib/exports.js";
+import { loadJsPdf } from "./lib/pdf.js";
+import Sidebar from "./components/Sidebar.jsx";
+import Topbar from "./components/Topbar.jsx";
+import DemoBanner from "./components/DemoBanner.jsx";
+import ToastStack from "./components/ToastStack.jsx";
+import DashboardView from "./components/DashboardView.jsx";
+import SearchView from "./components/SearchView.jsx";
+import LeadsView from "./components/LeadsView.jsx";
+import AuditsView from "./components/AuditsView.jsx";
+import MessagesView from "./components/MessagesView.jsx";
+import PipelineView from "./components/PipelineView.jsx";
+import SettingsView from "./components/SettingsView.jsx";
 import "./App.css";
-
-const STORAGE_KEYS = {
-  leads: "madevhub_growth_engine_leads",
-  activityLog: "madevhub_growth_engine_activity_log",
-};
-
-const INITIAL_LEADS = [];
-
-const SAFE_MODE_CONFIG = {
-  enabled: true,
-  singleCityEmailLimit: 3,
-  allUsaEmailLimit: 5,
-  normalSearchLimit: 8,
-  allUsaNormalSearchLimit: 12,
-};
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
-const API_ACCESS_TOKEN = import.meta.env.VITE_API_ACCESS_TOKEN || "";
-
-// Cabeceras con el token de acceso (si está configurado en el .env).
-const authHeaders = () =>
-  API_ACCESS_TOKEN ? { "x-access-token": API_ACCESS_TOKEN } : {};
-
-const CITY_OPTIONS = [
-  "Miami",
-  "All USA",
-  "Orlando",
-  "Tampa",
-  "Atlanta",
-  "Dallas",
-  "Houston",
-  "Austin",
-  "New York",
-  "Los Angeles",
-  "Chicago",
-  "Phoenix",
-  "Las Vegas",
-  "Denver",
-  "Seattle",
-  "Boston",
-  "San Diego",
-  "Nashville",
-  "Charlotte",
-  "Raleigh",
-  "Washington DC",
-];
-
-const NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "search", label: "Search Leads", icon: Search },
-  { id: "leads", label: "Businesses", icon: Building2 },
-  { id: "audits", label: "Audits", icon: Sparkles },
-  { id: "messages", label: "Messages", icon: Mail },
-  { id: "pipeline", label: "Pipeline", icon: BarChart3 },
-  { id: "settings", label: "Settings", icon: Settings },
-];
-
-const VIEW_META = {
-  dashboard: {
-    title: "Welcome back, Juan 👋",
-    subtitle: "Find local businesses that need websites and automation.",
-  },
-  search: {
-    title: "Search Leads",
-    subtitle: "Discover businesses with weak online presence, ready to close.",
-  },
-  leads: {
-    title: "Businesses",
-    subtitle: "Your full lead list. Select a business to work it.",
-  },
-  audits: {
-    title: "AI Audits",
-    subtitle: "Generate a digital-presence audit and proposal.",
-  },
-  messages: {
-    title: "Outreach",
-    subtitle: "Craft and send the perfect first message.",
-  },
-  pipeline: {
-    title: "Pipeline",
-    subtitle: "Move leads from New to Closed and track follow-ups.",
-  },
-  settings: {
-    title: "Settings",
-    subtitle: "Manage this lead, your data, and app preferences.",
-  },
-};
-
-const PIPELINE_STAGES = [
-  "New",
-  "Contacted",
-  "Interested",
-  "Proposal Sent",
-  "Closed",
-  "Lost",
-];
-
-const emptyLeadForm = {
-  name: "",
-  city: "Miami",
-  category: "Barbershop",
-  website: "No Website",
-  phone: "",
-  email: "",
-  instagram: "",
-  rating: "4.5",
-  reviews: "0",
-  opportunityScore: "90",
-};
-
-function loadFromLocalStorage(key, fallbackValue) {
-  try {
-    const savedData = localStorage.getItem(key);
-    return savedData ? JSON.parse(savedData) : fallbackValue;
-  } catch (error) {
-    console.error("Error loading from localStorage:", error);
-    return fallbackValue;
-  }
-}
-
-function getDefaultContactMode(lead) {
-  if (lead?.email) return "email";
-  if (lead?.instagram) return "instagram";
-  return "call";
-}
-
-function getActionLabel(contactMode) {
-  if (contactMode === "email") return "Send Email";
-  if (contactMode === "instagram") return "Copy Instagram DM";
-  return "Save Call Script";
-}
-
-function convertLeadToForm(lead) {
-  return {
-    name: lead.name || "",
-    city: lead.city || "Miami",
-    category: lead.category || "Barbershop",
-    website: lead.website || "No Website",
-    phone: lead.phone || "",
-    email: lead.email || "",
-    instagram: lead.instagram || "",
-    rating: String(lead.rating ?? "4.5"),
-    reviews: String(lead.reviews ?? "0"),
-    opportunityScore: String(lead.opportunityScore ?? "90"),
-  };
-}
-
-function createSafeFileName(name) {
-  return (
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/gi, "-")
-      .replace(/^-+|-+$/g, "") || "business"
-  );
-}
-
-const OUTREACH_STEPS = [
-  { id: "email", label: "Initial Email" },
-  { id: "instagram", label: "Instagram DM" },
-  { id: "followup1", label: "Follow-up 1" },
-  { id: "followup2", label: "Follow-up 2" },
-  { id: "call", label: "Call Script" },
-];
-
-const CLOSED_STATUSES = ["Closed", "Lost"];
-
-function getTodayDateKey() {
-  const today = new Date();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-
-  return `${today.getFullYear()}-${month}-${day}`;
-}
-
-function isLeadStillOpen(lead) {
-  return !CLOSED_STATUSES.includes(lead?.status);
-}
-
-// jsPDF arrastra html2canvas y dompurify (~380 kB). Sólo se carga cuando
-// el usuario exporta un PDF, para que el arranque del CRM sea ligero.
-async function loadJsPdf() {
-  const { jsPDF } = await import("jspdf");
-  return jsPDF;
-}
-
-function getOpportunityScoreFromWebsite(websiteStatus) {
-  if (websiteStatus === "No Website") return 95;
-  if (websiteStatus === "Facebook Only") return 90;
-  if (websiteStatus === "Old Website") return 82;
-  return 70;
-}
-
-function getLeadQuality(lead) {
-  if (!lead) {
-    return {
-      score: 0,
-      label: "Low Priority",
-      emoji: "❄️",
-      level: "low",
-      className: "low",
-    };
-  }
-
-  let score = 0;
-
-  const opportunityScore = Number(lead.opportunityScore) || 0;
-  const rating = Number(lead.rating) || 0;
-  const reviews = Number(lead.reviews) || 0;
-
-  if (opportunityScore >= 90) score += 25;
-  else if (opportunityScore >= 80) score += 18;
-  else if (opportunityScore >= 70) score += 10;
-
-  if (lead.email) score += 25;
-  if (lead.phone) score += 15;
-  if (lead.instagram) score += 10;
-  if (lead.googleMapsUrl) score += 5;
-
-  if (reviews >= 200) score += 15;
-  else if (reviews >= 75) score += 10;
-  else if (reviews >= 25) score += 6;
-
-  if (rating >= 4.7) score += 10;
-  else if (rating >= 4.3) score += 7;
-  else if (rating >= 4.0) score += 4;
-
-  if (lead.website === "No Website") score += 15;
-  else if (lead.website === "Facebook Only") score += 12;
-  else if (lead.website === "Old Website") score += 10;
-  else if (lead.website === "Has Website") score += 4;
-
-  const finalScore = Math.min(score, 100);
-
-  if (finalScore >= 75) {
-    return {
-      score: finalScore,
-      label: "Hot Lead",
-      emoji: "🔥",
-      level: "hot",
-      className: "hot",
-    };
-  }
-
-  if (finalScore >= 50) {
-    return {
-      score: finalScore,
-      label: "Good Lead",
-      emoji: "⭐",
-      level: "good",
-      className: "good",
-    };
-  }
-
-  return {
-    score: finalScore,
-    label: "Low Priority",
-    emoji: "❄️",
-    level: "low",
-    className: "low",
-  };
-}
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
   const backupFileInputRef = useRef(null);
 
   const [leads, setLeads] = useState(() =>
-    loadFromLocalStorage(STORAGE_KEYS.leads, INITIAL_LEADS)
+    loadInitialLeads()
   );
 
   const [selectedLead, setSelectedLead] = useState(() => {
-    const savedLeads = loadFromLocalStorage(STORAGE_KEYS.leads, INITIAL_LEADS);
+    const savedLeads = loadInitialLeads();
     return savedLeads[0] || null;
   });
 
@@ -298,7 +59,7 @@ export default function App() {
   const [hotLeadsOnly, setHotLeadsOnly] = useState(false);
 
   const [contactMode, setContactMode] = useState(() => {
-    const savedLeads = loadFromLocalStorage(STORAGE_KEYS.leads, INITIAL_LEADS);
+    const savedLeads = loadInitialLeads();
     return getDefaultContactMode(savedLeads[0]);
   });
 
@@ -464,88 +225,17 @@ export default function App() {
 
   // Plan del día: agrupa los leads en las cinco acciones que realmente
   // mueven el pipeline, para no tener que revisar la lista entera a mano.
-  const todayActionGroups = useMemo(() => {
-    const todayKey = getTodayDateKey();
-    const openLeads = leads.filter(isLeadStillOpen);
+  const todayActionGroups = useMemo(
+    () => buildTodayActionGroups(leads, getTodayDateKey()),
+    [leads]
+  );
 
-    const overdue = openLeads.filter(
-      (lead) => lead.followUpDate && lead.followUpDate < todayKey
-    );
-
-    const dueToday = openLeads.filter(
-      (lead) => lead.followUpDate === todayKey
-    );
-
-    const hotToContact = openLeads
-      .filter(
-        (lead) =>
-          lead.status === "New" && getLeadQuality(lead).level === "hot"
-      )
-      .sort((a, b) => getLeadQuality(b).score - getLeadQuality(a).score);
-
-    const waitingReply = openLeads.filter(
-      (lead) =>
-        ["Contacted", "Interested"].includes(lead.status) &&
-        (!lead.followUpDate || lead.followUpDate < todayKey)
-    );
-
-    const proposalsToClose = openLeads.filter(
-      (lead) => lead.status === "Proposal Sent"
-    );
-
-    return [
-      {
-        id: "overdue",
-        icon: "⏰",
-        title: "Overdue follow-ups",
-        subtitle: "Past their date",
-        view: "pipeline",
-        emptyText: "Nothing overdue. Good job.",
-        tag: () => "Overdue",
-        leads: overdue,
-      },
-      {
-        id: "due-today",
-        icon: "📅",
-        title: "Due today",
-        subtitle: "Scheduled for today",
-        view: "pipeline",
-        emptyText: "No follow-ups scheduled for today.",
-        tag: () => "Today",
-        leads: dueToday,
-      },
-      {
-        id: "hot",
-        icon: "🔥",
-        title: "Hot leads to contact",
-        subtitle: "Still marked as New",
-        view: "messages",
-        emptyText: "No untouched hot leads. Search for more.",
-        tag: (lead) => `${getLeadQuality(lead).score}/100`,
-        leads: hotToContact,
-      },
-      {
-        id: "waiting",
-        icon: "💬",
-        title: "Waiting on reply",
-        subtitle: "Contacted, no follow-up set",
-        view: "pipeline",
-        emptyText: "Every contacted lead has a next step.",
-        tag: (lead) => lead.status,
-        leads: waitingReply,
-      },
-      {
-        id: "proposals",
-        icon: "📄",
-        title: "Proposals to close",
-        subtitle: "Proposal already sent",
-        view: "pipeline",
-        emptyText: "No open proposals yet.",
-        tag: () => "Close",
-        leads: proposalsToClose,
-      },
-    ];
-  }, [leads]);
+  // The sample pipeline that ships with the public demo. Shown as a banner
+  // so nobody mistakes these for real leads they scraped.
+  const demoLeadCount = useMemo(
+    () => leads.filter(isDemoLead).length,
+    [leads]
+  );
 
   const todayActionCount = useMemo(
     () =>
@@ -657,6 +347,24 @@ export default function App() {
       top: 0,
       behavior: "smooth",
     });
+  };
+
+  const clearDemoLeads = () => {
+    const realLeads = leads.filter((lead) => !isDemoLead(lead));
+
+    setLeads(realLeads);
+
+    const nextSelectedLead = realLeads[0] || null;
+    setSelectedLead(nextSelectedLead);
+    setContactMode(getDefaultContactMode(nextSelectedLead));
+    setGeneratedAudit("");
+    setOutreachTitle("");
+    setOutreachMessage("");
+    setLeadNoteText("");
+    setFollowUpDate(nextSelectedLead?.followUpDate || "");
+    resetLeadForm();
+
+    notify("Demo leads removed. The CRM is yours now.", "success");
   };
 
   const deleteSelectedLead = () => {
@@ -1058,75 +766,7 @@ export default function App() {
       return;
     }
 
-    const headers = [
-      "Business",
-      "City",
-      "Category",
-      "Website Status",
-      "Website URL",
-      "Phone",
-      "Email",
-      "Instagram",
-      "Facebook",
-      "LinkedIn",
-      "Rating",
-      "Reviews",
-      "Opportunity Score",
-      "Status",
-      "Follow-up Date",
-      "Proposal Sent Date",
-      "Notes",
-      "Address",
-      "Google Maps",
-    ];
-
-    const escapeCsvValue = (value) => {
-      const safeValue = String(value ?? "");
-      return `"${safeValue.replace(/"/g, '""')}"`;
-    };
-
-    const rows = leads.map((lead) => [
-      lead.name,
-      lead.city,
-      lead.category,
-      lead.website,
-      lead.websiteUrl,
-      lead.phone,
-      lead.email,
-      lead.instagram,
-      lead.facebook,
-      lead.linkedin,
-      lead.rating,
-      lead.reviews,
-      lead.opportunityScore,
-      lead.status,
-      lead.followUpDate,
-      lead.proposalSentDate,
-      Array.isArray(lead.notes)
-        ? lead.notes.map((note) => `${note.date}: ${note.text}`).join(" | ")
-        : "",
-      lead.address,
-      lead.googleMapsUrl,
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map(escapeCsvValue).join(","))
-      .join("\n");
-
-    const blob = new Blob([csvContent], {
-      type: "text/csv;charset=utf-8",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const downloadLink = document.createElement("a");
-
-    downloadLink.href = url;
-    downloadLink.download = "madevhub-leads.csv";
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-
-    document.body.removeChild(downloadLink);
-    URL.revokeObjectURL(url);
+    downloadTextFile(leadsToCsv(leads), "madevhub-leads.csv", "text/csv");
 
     addActivityLog("Export Leads", "Leads exported as CSV", "export");
   };
@@ -1386,7 +1026,6 @@ export default function App() {
     reader.readAsText(file);
   };
 
-
   const clearSavedData = () => {
     const confirmClear = window.confirm(
       "Are you sure you want to reset all saved leads and activity logs?"
@@ -1397,7 +1036,7 @@ export default function App() {
     localStorage.removeItem(STORAGE_KEYS.leads);
     localStorage.removeItem(STORAGE_KEYS.activityLog);
 
-    setLeads(INITIAL_LEADS);
+    setLeads([]);
     setSelectedLead(null);
     setContactMode("call");
     setActivityLog([]);
@@ -1413,114 +1052,13 @@ export default function App() {
     resetLeadForm();
   };
 
-  const generateContactMessage = () => {
-    if (!selectedLead) return "";
-
-    if (contactMode === "email") {
-      return `Subject: Quick idea for ${selectedLead.name}
-
-Hi ${selectedLead.name},
-
-I found your business online and noticed that your digital presence could be improved. You already have a strong reputation with ${selectedLead.rating} stars and ${selectedLead.reviews} reviews, but I noticed your website status is: ${selectedLead.website}.
-
-At MADEVHUB, we help local businesses get professional websites, better visibility, and more customers.
-
-Would you like me to send you a free digital audit for your business?
-
-Best,
-Juan
-MADEVHUB`;
-    }
-
-    if (contactMode === "instagram") {
-      return `Hi ${selectedLead.name}, I found your business online and noticed you have a strong local presence with ${selectedLead.rating} stars and ${selectedLead.reviews} reviews.
-
-I also noticed your website status is: ${selectedLead.website}.
-
-I help local businesses get professional websites and attract more customers online. Would you like me to send you a free quick digital audit?`;
-    }
-
-    return `Call Script for ${selectedLead.name}
-
-Hi, my name is Juan from MADEVHUB. I found your business online and noticed you have great reviews.
-
-I help local businesses improve their online presence with professional websites, better visibility, and simple automation.
-
-I wanted to ask if you already have someone helping you with your website or online presence?
-
-If not, I can send you a free digital audit showing a few ways your business could attract more local customers.`;
-  };
+  const generateContactMessage = () =>
+    buildContactMessage(selectedLead, contactMode);
 
   const generateAudit = () => {
     if (!selectedLead) return;
 
-    const websiteProblem =
-      selectedLead.website === "No Website"
-        ? "The business does not have a professional website."
-        : selectedLead.website === "Old Website"
-        ? "The business may have an outdated website that needs improvement."
-        : selectedLead.website === "Facebook Only"
-        ? "The business depends mostly on Facebook instead of having a professional website."
-        : "The business has a website, but it can still improve its online presence.";
-
-    const contactProblem = selectedLead.email
-      ? "The business has an email available, so email outreach is possible."
-      : selectedLead.instagram
-      ? "No public email was found, but Instagram and phone outreach are possible."
-      : "No public email or Instagram was found, so phone outreach may be the best option.";
-
-    const addressInfo = selectedLead.address
-      ? `Address: ${selectedLead.address}`
-      : "Address: Not found";
-
-    const websiteInfo = selectedLead.websiteUrl
-      ? `Website URL: ${selectedLead.websiteUrl}`
-      : "Website URL: Not found";
-
-    const googleMapsInfo = selectedLead.googleMapsUrl
-      ? `Google Maps: ${selectedLead.googleMapsUrl}`
-      : "Google Maps: Not found";
-
-    const audit = `Digital Presence Audit for ${selectedLead.name}
-
-Business Type: ${selectedLead.category}
-Location: ${selectedLead.city}
-${addressInfo}
-${websiteInfo}
-${googleMapsInfo}
-Rating: ${selectedLead.rating} stars
-Reviews: ${selectedLead.reviews}
-Opportunity Score: ${selectedLead.opportunityScore}%
-Lead Quality: ${getLeadQuality(selectedLead).emoji} ${getLeadQuality(selectedLead).label} (${getLeadQuality(selectedLead).score}/100)
-Follow-up: ${selectedLead.followUpDate || "Not scheduled"}
-
-Main Problems Found:
-1. ${websiteProblem}
-2. ${contactProblem}
-3. The business may be missing a stronger online sales system.
-4. There is an opportunity to improve trust, booking, and local visibility.
-5. The business could convert more visitors with a better call-to-action.
-
-Recommended Improvements:
-1. Create a modern professional website.
-2. Add a clear call-to-action such as "Book Now", "Call Now", or "Get a Quote".
-3. Add services, prices, location, photos, and customer reviews.
-4. Add a contact form connected to email.
-5. Improve local SEO for customers searching in ${selectedLead.city}.
-6. Add simple automation for follow-ups, appointments, or quotes.
-
-MADEVHUB Opportunity:
-This business could benefit from a professional landing page, mobile-friendly design, local SEO setup, and simple automation to help convert visitors into customers.
-
-Suggested Offer:
-Website Setup: $299 - $799
-Monthly Maintenance: $49 - $149/month
-Optional SEO / Automation: $99 - $299/month
-
-Next Step:
-Send a personalized message offering a free digital audit and a quick website improvement idea.`;
-
-    setGeneratedAudit(audit);
+    setGeneratedAudit(buildAudit(selectedLead));
     addActivityLog(selectedLead.name, "Digital audit generated", "audit");
   };
 
@@ -1863,115 +1401,18 @@ Websites • Local SEO • Automation • Digital Growth`
   const generateOutreachSequence = (type) => {
     if (!selectedLead) return;
 
-    const leadQuality = getLeadQuality(selectedLead);
-    const businessName = selectedLead.name;
-    const cityName = selectedLead.city || "your area";
-    const businessCategory = selectedLead.category || "business";
-    const ratingText = selectedLead.rating
-      ? `${selectedLead.rating} stars`
-      : "strong local presence";
-    const reviewsText = selectedLead.reviews
-      ? `${selectedLead.reviews} reviews`
-      : "customer reviews";
+    const selectedMessage = buildOutreachMessages(selectedLead)[type];
 
-    const websiteObservation =
-      selectedLead.website === "No Website"
-        ? "I noticed your business may not have a professional website yet."
-        : selectedLead.website === "Old Website"
-        ? "I noticed your website may be due for a more modern and conversion-focused upgrade."
-        : selectedLead.website === "Facebook Only"
-        ? "I noticed your business may be relying heavily on Facebook instead of a dedicated website."
-        : "I noticed there may be room to improve your website conversion and local visibility.";
-
-    const messages = {
-      email: {
-        title: "Initial Email",
-        body: `Subject: Quick digital growth idea for ${businessName}
-
-Hi ${businessName},
-
-I found your business online while looking at ${businessCategory} businesses in ${cityName}. You already have a strong reputation with ${ratingText} and ${reviewsText}.
-
-${websiteObservation}
-
-At MADEVHUB, we help local businesses improve their website, local SEO, and lead capture so more visitors become real customers.
-
-I prepared a quick digital growth idea for your business.
-
-Would you like me to send it over?
-
-Best,
-Juan
-MADEVHUB`,
-      },
-
-      instagram: {
-        title: "Instagram DM",
-        body: `Hi ${businessName}, I found your business online and noticed you have a strong local presence in ${cityName}.
-
-${websiteObservation}
-
-I help local businesses get better websites, stronger local visibility, and more customer inquiries online.
-
-I prepared a quick digital growth idea for your business. Would you like me to send it over?`,
-      },
-
-      followup1: {
-        title: "Follow-up 1",
-        body: `Hi ${businessName},
-
-Just wanted to follow up on my previous message.
-
-I noticed a few simple improvements that could help your online presence convert more visitors into customers, especially for people searching for ${businessCategory} services in ${cityName}.
-
-I can send you the quick audit idea if you would like to see it.
-
-Best,
-Juan
-MADEVHUB`,
-      },
-
-      followup2: {
-        title: "Follow-up 2",
-        body: `Hi ${businessName},
-
-Last quick follow-up from me.
-
-I know you are probably busy, so I will keep it simple: I found a few opportunities to improve trust, visibility, and lead capture for your business online.
-
-No pressure — I can send the quick idea over if it is useful.
-
-Best,
-Juan
-MADEVHUB`,
-      },
-
-      call: {
-        title: "Call Script",
-        body: `Call Script for ${businessName}
-
-Hi, my name is Juan from MADEVHUB.
-
-I found your business online and noticed you have a strong reputation with ${ratingText} and ${reviewsText}.
-
-The reason for my call is that I help local businesses improve their website, local visibility, and lead capture system.
-
-I noticed one quick opportunity: ${websiteObservation}
-
-I wanted to ask: do you currently have someone helping you with your website or online marketing?
-
-If not, I can send you a free quick digital audit with a few improvement ideas.`,
-      },
-    };
-
-    const selectedMessage = messages[type];
+    if (!selectedMessage) return;
 
     setOutreachTitle(selectedMessage.title);
     setOutreachMessage(selectedMessage.body);
 
     addActivityLog(
-      businessName,
-      `${selectedMessage.title} generated. Lead quality: ${leadQuality.label}`,
+      selectedLead.name,
+      `${selectedMessage.title} generated. Lead quality: ${
+        getLeadQuality(selectedLead).label
+      }`,
       "outreach"
     );
   };
@@ -2089,7 +1530,6 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
     notify(`${selectedLead.name} marked as Proposal Sent.`);
   };
-
 
   const contactMessage = generateContactMessage();
 
@@ -2328,36 +1768,7 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
   return (
     <main className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-icon">M</div>
-          <div>
-            <h1>MADEVHUB</h1>
-            <p>AI Growth Engine</p>
-          </div>
-        </div>
-
-        <nav className="nav">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={activeView === item.id ? "active" : ""}
-                onClick={() => setActiveView(item.id)}
-              >
-                <Icon size={18} /> {item.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-box">
-          <p>Find businesses. Generate audits. Close more clients.</p>
-          <button onClick={() => setActiveView("search")}>Find New Leads</button>
-        </div>
-      </aside>
+      <Sidebar activeView={activeView} setActiveView={setActiveView} />
 
       <section className="content">
         <input
@@ -2368,1054 +1779,145 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
           onChange={importPrivateBackup}
         />
 
-        <header className="topbar">
-          <div>
-            <h2>{currentMeta.title}</h2>
-            <p>{currentMeta.subtitle}</p>
-            <div className="safe-mode-badge">
-              Safe Mode ON · City emails: {safeModeLimits.singleCityEmailLimit}{" "}
-              · All USA emails: {safeModeLimits.allUsaEmailLimit}
-            </div>
-          </div>
+        <Topbar
+          currentMeta={currentMeta}
+          safeModeLimits={safeModeLimits}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          startAddLead={startAddLead}
+          showLeadForm={showLeadForm}
+          editingLeadId={editingLeadId}
+          exportLeadsCsv={exportLeadsCsv}
+        />
 
-          <div className="topbar-actions">
-            <button type="button" className="theme-toggle" onClick={toggleTheme}>
-              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-              {theme === "dark" ? "Claro" : "Oscuro"}
-            </button>
-
-            <button className="primary-btn" onClick={startAddLead}>
-              {showLeadForm && editingLeadId === null ? "Close Form" : "Add Lead"}
-            </button>
-
-            <button className="secondary-btn" onClick={exportLeadsCsv}>
-              Export CSV
-            </button>
-          </div>
-        </header>
+        {demoLeadCount > 0 && (
+          <DemoBanner
+            demoLeadCount={demoLeadCount}
+            clearDemoLeads={clearDemoLeads}
+          />
+        )}
 
         {/* ===================== DASHBOARD ===================== */}
         {activeView === "dashboard" && (
-          <>
-            <section className="daily-dashboard">
-              <div className="daily-dashboard-header">
-                <div>
-                  <h3>Today's Action Plan</h3>
-                  <p>
-                    The leads that need you right now, grouped by what to do
-                    next.
-                  </p>
-                </div>
-                <span>
-                  {todayActionCount}{" "}
-                  {todayActionCount === 1 ? "action" : "actions"} pending
-                </span>
-              </div>
-
-              <div className="daily-action-grid">
-                {todayActionGroups.map((group) => (
-                  <div className="daily-action-card" key={group.id}>
-                    <div className="daily-action-card-header">
-                      <span aria-hidden="true">{group.icon}</span>
-                      <div>
-                        <strong>{group.title}</strong>
-                        <small>
-                          {group.leads.length} · {group.subtitle}
-                        </small>
-                      </div>
-                    </div>
-
-                    <div className="daily-action-list">
-                      {group.leads.length === 0 && <p>{group.emptyText}</p>}
-
-                      {group.leads.slice(0, 4).map((lead) => (
-                        <button
-                          type="button"
-                          key={lead.id}
-                          onClick={() => openLeadInView(lead, group.view)}
-                        >
-                          <span>
-                            <strong>{lead.name}</strong>
-                            <small>
-                              {lead.category} · {lead.city}
-                            </small>
-                          </span>
-                          <em>{group.tag(lead)}</em>
-                        </button>
-                      ))}
-
-                      {group.leads.length > 4 && (
-                        <button
-                          type="button"
-                          className="daily-more"
-                          onClick={() => setActiveView("leads")}
-                        >
-                          <span>
-                            <strong>
-                              +{group.leads.length - 4} more
-                            </strong>
-                          </span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="stats-grid">
-              <StatCard title="Total Leads" value={stats.total} />
-              <StatCard title="Hot Leads" value={stats.hotLeads} />
-              <StatCard title="Contacted" value={stats.contacted} />
-              <StatCard title="Closed Deals" value={stats.closed} />
-            </section>
-
-            <section className="view-grid">
-              <div className="card">
-                <div className="card-header">
-                  <div>
-                    <h3>Pipeline Overview</h3>
-                    <p className="muted">
-                      {leadsWithEmail} of {leads.length} leads have an email (
-                      {emailRate}%).
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pipeline-board">
-                  {pipelineCounts.map(({ stage, count }) => (
-                    <div className="pipeline-stat" key={stage}>
-                      <span className="pipeline-stat-count">{count}</span>
-                      <span className="pipeline-stat-label">{stage}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="quick-actions">
-                  <button
-                    className="primary-btn"
-                    onClick={() => setActiveView("search")}
-                  >
-                    Search New Leads
-                  </button>
-                  <button
-                    className="secondary-btn"
-                    onClick={() => setActiveView("leads")}
-                  >
-                    View All Businesses
-                  </button>
-                </div>
-              </div>
-
-              <div className="card">
-                <h3>Activity Log</h3>
-                <p className="muted">
-                  Recent messages, calls, and outreach actions.
-                </p>
-
-                <div className="log-list">
-                  {activityLog.length === 0 && (
-                    <div className="empty-state">
-                      No activity yet. Add a lead, send a message, or generate an
-                      audit to create a log.
-                    </div>
-                  )}
-
-                  {activityLog.slice(0, 12).map((item) => (
-                    <div className="log-item" key={item.id}>
-                      <div>
-                        <strong>{item.businessName}</strong>
-                        <p>{item.action}</p>
-                      </div>
-                      <small>
-                        <Clock size={14} />
-                        {item.date}
-                      </small>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          </>
+          <DashboardView
+            activityLog={activityLog}
+            emailRate={emailRate}
+            leads={leads}
+            leadsWithEmail={leadsWithEmail}
+            openLeadInView={openLeadInView}
+            pipelineCounts={pipelineCounts}
+            setActiveView={setActiveView}
+            stats={stats}
+            todayActionCount={todayActionCount}
+            todayActionGroups={todayActionGroups}
+          />
         )}
-
         {/* ===================== SEARCH ===================== */}
         {activeView === "search" && (
-          <section className="view-grid single">
-            <div className="card" id="search-leads">
-              <div className="card-header">
-                <div>
-                  <h3>Search Businesses</h3>
-                  <p>
-                    Find businesses that need a website or better online
-                    presence.
-                  </p>
-                </div>
-              </div>
-
-              <div className="safe-mode-card">
-                <strong>Safe Mode ON:</strong> normal searches are limited, and
-                email enrichment is capped to protect your Outscraper credits.
-              </div>
-
-              <div className="filters">
-                <label>
-                  City
-                  <select value={city} onChange={(e) => setCity(e.target.value)}>
-                    {CITY_OPTIONS.map((cityOption) => (
-                      <option key={cityOption}>{cityOption}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Category
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                  >
-                    <option>All</option>
-                    <option>Barbershop</option>
-                    <option>Beauty Salon</option>
-                    <option>Cleaning Company</option>
-                    <option>Restaurant</option>
-                    <option>Dentist</option>
-                    <option>Contractor</option>
-                    <option>Real Estate</option>
-                  </select>
-                </label>
-
-                <label>
-                  Website Status
-                  <select
-                    value={websiteStatus}
-                    onChange={(e) => setWebsiteStatus(e.target.value)}
-                  >
-                    <option>Any</option>
-                    <option>No Website</option>
-                    <option>Old Website</option>
-                    <option>Facebook Only</option>
-                    <option>Has Website</option>
-                  </select>
-                </label>
-
-                <div className="filter-actions">
-                  <button
-                    className="primary-btn"
-                    onClick={handleFindLeads}
-                    disabled={isSearching || isSearchingEmails}
-                  >
-                    {isSearching ? "Searching..." : "Find Leads"}
-                  </button>
-
-                  <button
-                    className="secondary-btn"
-                    onClick={handleFindLeadsWithEmails}
-                    disabled={isSearching || isSearchingEmails}
-                  >
-                    {isSearchingEmails
-                      ? "Finding Emails..."
-                      : "Find Leads With Emails"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="quality-filter-row">
-                <button
-                  type="button"
-                  className={`secondary-btn ${
-                    hotLeadsOnly ? "active-filter" : ""
-                  }`}
-                  onClick={() => setHotLeadsOnly((current) => !current)}
-                >
-                  {hotLeadsOnly ? "Showing Hot Leads Only" : "Show Hot Leads Only"}
-                </button>
-
-                <span>Hot Leads are the best prospects to contact first.</span>
-              </div>
-            </div>
-
-            <div className="card private-tools-card">
-              <h3>Add a Lead Manually</h3>
-              <p className="muted">
-                Don't want to spend credits? Add a business by hand and work it
-                like any other lead.
-              </p>
-              <div className="private-tools-grid">
-                <button className="primary-btn" onClick={startAddLead}>
-                  Add Lead Manually
-                </button>
-                <button
-                  className="secondary-btn"
-                  onClick={() => setActiveView("leads")}
-                >
-                  View Businesses
-                </button>
-              </div>
-            </div>
-          </section>
+          <SearchView
+            category={category}
+            city={city}
+            handleFindLeads={handleFindLeads}
+            handleFindLeadsWithEmails={handleFindLeadsWithEmails}
+            hotLeadsOnly={hotLeadsOnly}
+            isSearching={isSearching}
+            isSearchingEmails={isSearchingEmails}
+            setActiveView={setActiveView}
+            setCategory={setCategory}
+            setCity={setCity}
+            setHotLeadsOnly={setHotLeadsOnly}
+            setWebsiteStatus={setWebsiteStatus}
+            startAddLead={startAddLead}
+            websiteStatus={websiteStatus}
+          />
         )}
-
         {/* ===================== BUSINESSES / LEADS ===================== */}
         {activeView === "leads" && (
-          <section className="main-grid">
-            <div className="left-panel">
-              {leadFormCard}
-
-              <div className="card" id="businesses">
-                <div className="card-header with-search">
-                  <h3>
-                    {filteredLeads.length}{" "}
-                    {filteredLeads.length === 1 ? "Lead" : "Leads"} Found
-                  </h3>
-                  {leadSearch && (
-                    <button
-                      type="button"
-                      className="secondary-btn"
-                      onClick={() => setLeadSearch("")}
-                    >
-                      Clear search
-                    </button>
-                  )}
-                </div>
-
-                <div className="filters lead-search-row">
-                  <label>
-                    Search
-                    <input
-                      type="search"
-                      value={leadSearch}
-                      onChange={(event) => setLeadSearch(event.target.value)}
-                      placeholder="Search by name, email, phone, city or category"
-                    />
-                  </label>
-                </div>
-
-                <div className="table">
-                  <div className="table-row table-head">
-                    <span>Business</span>
-                    <span>Quality</span>
-                    <span>Website</span>
-                    <span>Email</span>
-                    <span>Rating</span>
-                    <span>Score</span>
-                    <span>Status</span>
-                  </div>
-
-                  {filteredLeads.map((lead) => (
-                    <button
-                      key={lead.id}
-                      className={`table-row lead-row ${
-                        selectedLead?.id === lead.id ? "selected" : ""
-                      }`}
-                      onClick={() => handleSelectLead(lead)}
-                    >
-                      <span>
-                        <strong>{lead.name}</strong>
-                        <small>
-                          {lead.category} · {lead.city}
-                        </small>
-                        {lead.followUpDate && (
-                          <small
-                            className={`followup-inline ${getFollowUpStatus(lead)
-                              .toLowerCase()
-                              .replace(" ", "-")}`}
-                          >
-                            Follow-up: {lead.followUpDate} ·{" "}
-                            {getFollowUpStatus(lead)}
-                          </small>
-                        )}
-                      </span>
-
-                      <span
-                        className={`quality-badge ${
-                          getLeadQuality(lead).className
-                        }`}
-                      >
-                        {getLeadQuality(lead).emoji} {getLeadQuality(lead).label}
-                      </span>
-
-                      <span>{lead.website}</span>
-                      <span
-                        className={lead.email ? "email-found" : "email-missing"}
-                      >
-                        {lead.email ? lead.email : "No email"}
-                      </span>
-                      <span>{lead.rating} ⭐</span>
-                      <span className="score">{lead.opportunityScore}%</span>
-                      <span className="status">{lead.status}</span>
-                    </button>
-                  ))}
-
-                  {filteredLeads.length === 0 && (
-                    <div className="empty-state">
-                      {leads.length === 0
-                        ? "No leads yet. Head to Search Leads to find businesses, or add one manually."
-                        : "No leads match these filters. Try clearing the search or the filters in Search Leads."}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <aside className="right-panel">
-              {selectedLead ? (
-                <div className="card lead-detail-card">
-                  <div className="lead-detail-head">
-                    <div>
-                      <h3>{selectedLead.name}</h3>
-                      <p className="muted">
-                        {selectedLead.category} · {selectedLead.city}
-                      </p>
-                    </div>
-                    <span
-                      className={`quality-badge ${
-                        getLeadQuality(selectedLead).className
-                      }`}
-                    >
-                      {getLeadQuality(selectedLead).emoji}{" "}
-                      {getLeadQuality(selectedLead).label}
-                    </span>
-                  </div>
-
-                  <div className="score-circle">
-                    {selectedLead.opportunityScore}%
-                  </div>
-
-                  <ul className="detail-facts">
-                    <li>
-                      <span>Website</span>
-                      <strong>{selectedLead.website}</strong>
-                    </li>
-                    <li>
-                      <span>Email</span>
-                      <strong>{selectedLead.email || "Not found"}</strong>
-                    </li>
-                    <li>
-                      <span>Phone</span>
-                      <strong>{selectedLead.phone || "Not found"}</strong>
-                    </li>
-                    <li>
-                      <span>Rating</span>
-                      <strong>
-                        {selectedLead.rating} ⭐ ({selectedLead.reviews})
-                      </strong>
-                    </li>
-                    <li>
-                      <span>Status</span>
-                      <strong>{selectedLead.status}</strong>
-                    </li>
-                  </ul>
-
-                  <div className="detail-actions">
-                    <button
-                      className="primary-btn full"
-                      onClick={() => setActiveView("audits")}
-                    >
-                      Open Audit
-                    </button>
-                    <button
-                      className="secondary-btn full"
-                      onClick={() => setActiveView("messages")}
-                    >
-                      Write Message
-                    </button>
-                    <button
-                      className="secondary-btn full"
-                      onClick={() => setActiveView("pipeline")}
-                    >
-                      Update Pipeline
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="card">
-                  <h3>No Lead Selected</h3>
-                  <p className="muted">Add or select a lead to see details.</p>
-                </div>
-              )}
-            </aside>
-          </section>
+          <LeadsView
+            filteredLeads={filteredLeads}
+            getFollowUpStatus={getFollowUpStatus}
+            handleSelectLead={handleSelectLead}
+            leadFormCard={leadFormCard}
+            leadSearch={leadSearch}
+            leads={leads}
+            selectedLead={selectedLead}
+            setActiveView={setActiveView}
+            setLeadSearch={setLeadSearch}
+          />
         )}
-
         {/* ===================== AUDITS ===================== */}
         {activeView === "audits" && (
-          <section className="view-grid single">
-            {selectedLead ? (
-              <div className="card" id="audits">
-                <h3>AI Audit Preview</h3>
-                <p className="muted">{selectedLead.name}</p>
-
-                <div className="score-circle">
-                  {selectedLead.opportunityScore}%
-                </div>
-
-                <ul className="audit-list">
-                  <li>
-                    Lead quality:{" "}
-                    <span
-                      className={`quality-badge ${
-                        getLeadQuality(selectedLead).className
-                      }`}
-                    >
-                      {getLeadQuality(selectedLead).emoji}{" "}
-                      {getLeadQuality(selectedLead).label} (
-                      {getLeadQuality(selectedLead).score}/100)
-                    </span>
-                  </li>
-
-                  <li>
-                    Follow-up:{" "}
-                    {selectedLead.followUpDate
-                      ? `${selectedLead.followUpDate} · ${getFollowUpStatus(
-                          selectedLead
-                        )}`
-                      : "Not scheduled"}
-                  </li>
-
-                  <li>
-                    Proposal sent:{" "}
-                    {selectedLead.proposalSentDate
-                      ? selectedLead.proposalSentDate
-                      : "Not sent"}
-                  </li>
-
-                  <li>Website status: {selectedLead.website}</li>
-                  <li>Google rating: {selectedLead.rating}</li>
-                  <li>Reviews: {selectedLead.reviews}</li>
-
-                  <li>
-                    Phone: {selectedLead.phone ? selectedLead.phone : "Not found"}
-                  </li>
-
-                  <li>
-                    Email: {selectedLead.email ? selectedLead.email : "Not found"}
-                  </li>
-
-                  <li>
-                    Instagram:{" "}
-                    {selectedLead.instagram
-                      ? selectedLead.instagram
-                      : "Not found"}
-                  </li>
-
-                  <li>
-                    Address:{" "}
-                    {selectedLead.address ? selectedLead.address : "Not found"}
-                  </li>
-
-                  <li>
-                    Website URL:{" "}
-                    {selectedLead.websiteUrl ? (
-                      <a
-                        href={selectedLead.websiteUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open Website
-                      </a>
-                    ) : (
-                      "Not found"
-                    )}
-                  </li>
-
-                  <li>
-                    Google Maps:{" "}
-                    {selectedLead.googleMapsUrl ? (
-                      <a
-                        href={selectedLead.googleMapsUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open Maps
-                      </a>
-                    ) : (
-                      "Not found"
-                    )}
-                  </li>
-
-                  <li>
-                    Facebook:{" "}
-                    {selectedLead.facebook ? (
-                      <a
-                        href={selectedLead.facebook}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open Facebook
-                      </a>
-                    ) : (
-                      "Not found"
-                    )}
-                  </li>
-
-                  <li>
-                    LinkedIn:{" "}
-                    {selectedLead.linkedin ? (
-                      <a
-                        href={selectedLead.linkedin}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open LinkedIn
-                      </a>
-                    ) : (
-                      "Not found"
-                    )}
-                  </li>
-
-                  <li>
-                    WhatsApp:{" "}
-                    {selectedLead.whatsapp ? selectedLead.whatsapp : "Not found"}
-                  </li>
-                </ul>
-
-                <div className="audit-buttons">
-                  <button className="primary-btn full" onClick={generateAudit}>
-                    Generate Audit
-                  </button>
-
-                  <button
-                    className="secondary-btn full"
-                    onClick={handleEnrichLead}
-                    disabled={isEnriching || !selectedLead.websiteUrl}
-                  >
-                    {isEnriching ? "Finding..." : "Find Email / Socials"}
-                  </button>
-
-                  <button className="secondary-btn full" onClick={exportAudit}>
-                    Export TXT
-                  </button>
-
-                  <button className="secondary-btn full" onClick={exportAuditPdf}>
-                    Export PDF
-                  </button>
-
-                  <button
-                    className="primary-btn full"
-                    onClick={createClientProposalPdf}
-                  >
-                    Create Client Proposal
-                  </button>
-                </div>
-
-                {generatedAudit && (
-                  <div className="audit-report">
-                    <h4>Generated Audit</h4>
-                    <p>{generatedAudit}</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              noLeadState
-            )}
-          </section>
+          <AuditsView
+            createClientProposalPdf={createClientProposalPdf}
+            exportAudit={exportAudit}
+            exportAuditPdf={exportAuditPdf}
+            generateAudit={generateAudit}
+            generatedAudit={generatedAudit}
+            getFollowUpStatus={getFollowUpStatus}
+            handleEnrichLead={handleEnrichLead}
+            isEnriching={isEnriching}
+            noLeadState={noLeadState}
+            selectedLead={selectedLead}
+          />
         )}
-
         {/* ===================== MESSAGES ===================== */}
         {activeView === "messages" && (
-          <section className="view-grid single">
-            {selectedLead ? (
-              <>
-                <div className="card">
-                  <h3>Contact Actions</h3>
-                  <p className="muted">
-                    Choose the best way to contact {selectedLead.name}.
-                  </p>
-
-                  <div className="contact-actions">
-                    <button
-                      className={contactMode === "email" ? "active" : ""}
-                      disabled={!selectedLead.email}
-                      onClick={() => setContactMode("email")}
-                    >
-                      <Mail size={16} />
-                      Email
-                    </button>
-
-                    <button
-                      className={contactMode === "instagram" ? "active" : ""}
-                      disabled={!selectedLead.instagram}
-                      onClick={() => setContactMode("instagram")}
-                    >
-                      <MessageCircle size={16} />
-                      Instagram
-                    </button>
-
-                    <button
-                      className={contactMode === "call" ? "active" : ""}
-                      disabled={!selectedLead.phone}
-                      onClick={() => setContactMode("call")}
-                    >
-                      <Phone size={16} />
-                      Call
-                    </button>
-                  </div>
-
-                  <div className="contact-info">
-                    <strong>Selected channel:</strong> {contactMode}
-                  </div>
-                </div>
-
-                <div className="card" id="messages">
-                  <h3>Generated Message</h3>
-                  <p className="message-box">{contactMessage}</p>
-
-                  <div className="actions">
-                    <button className="secondary-btn" onClick={copyMessage}>
-                      <Copy size={16} />
-                      Copy
-                    </button>
-
-                    <button className="primary-btn" onClick={handleSendAction}>
-                      <Send size={16} />
-                      {getActionLabel(contactMode)}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="card" id="outreach">
-                  <div className="card-header">
-                    <div>
-                      <h3>Outreach Sequence</h3>
-                      <p className="muted">
-                        Five ready-to-send steps for {selectedLead.name}. Pick
-                        one, copy it, and mark the lead as contacted.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="outreach-grid">
-                    {OUTREACH_STEPS.map((step) => (
-                      <button
-                        key={step.id}
-                        type="button"
-                        className={
-                          outreachTitle === step.label
-                            ? "primary-btn"
-                            : "secondary-btn"
-                        }
-                        onClick={() => generateOutreachSequence(step.id)}
-                      >
-                        {step.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {outreachMessage ? (
-                    <div className="outreach-preview">
-                      <div className="outreach-preview-header">
-                        <strong>{outreachTitle}</strong>
-                        <span>
-                          {getLeadQuality(selectedLead).emoji}{" "}
-                          {getLeadQuality(selectedLead).label}
-                        </span>
-                      </div>
-
-                      <p>{outreachMessage}</p>
-
-                      <div className="actions">
-                        <button
-                          className="secondary-btn"
-                          onClick={copyOutreachMessage}
-                        >
-                          <Copy size={16} />
-                          Copy Message
-                        </button>
-
-                        <button
-                          className="primary-btn"
-                          onClick={markOutreachContacted}
-                        >
-                          <Send size={16} />
-                          Mark as Contacted
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="empty-state">
-                      Pick a step above to generate a personalized message for
-                      this lead.
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              noLeadState
-            )}
-          </section>
+          <MessagesView
+            contactMessage={contactMessage}
+            contactMode={contactMode}
+            copyMessage={copyMessage}
+            copyOutreachMessage={copyOutreachMessage}
+            generateOutreachSequence={generateOutreachSequence}
+            handleSendAction={handleSendAction}
+            markOutreachContacted={markOutreachContacted}
+            noLeadState={noLeadState}
+            outreachMessage={outreachMessage}
+            outreachTitle={outreachTitle}
+            selectedLead={selectedLead}
+            setContactMode={setContactMode}
+          />
         )}
-
         {/* ===================== PIPELINE ===================== */}
         {activeView === "pipeline" && (
-          <section className="view-grid single">
-            {selectedLead ? (
-              <>
-                <div className="card" id="pipeline">
-                  <h3>Pipeline Status — {selectedLead.name}</h3>
-                  <p className="muted">Move this lead through your sales stages.</p>
-
-                  <div className="pipeline-buttons">
-                    {PIPELINE_STAGES.map((status) => (
-                      <button
-                        key={status}
-                        className={
-                          selectedLead.status === status ? "active" : ""
-                        }
-                        onClick={() => updateLeadStatus(selectedLead.id, status)}
-                      >
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="card" id="follow-up">
-                  <h3>Lead Notes &amp; Follow-up</h3>
-                  <p className="muted">
-                    Save notes and schedule the next follow-up for this lead.
-                  </p>
-
-                  <div className="followup-summary">
-                    <div>
-                      <strong>Next Follow-up</strong>
-                      <span>
-                        {selectedLead.followUpDate
-                          ? `${selectedLead.followUpDate} · ${getFollowUpStatus(
-                              selectedLead
-                            )}`
-                          : "Not scheduled"}
-                      </span>
-                    </div>
-
-                    <div>
-                      <strong>Proposal</strong>
-                      <span>
-                        {selectedLead.proposalSentDate
-                          ? `Sent ${selectedLead.proposalSentDate}`
-                          : "Not sent"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="followup-controls">
-                    <label>
-                      Next Follow-up Date
-                      <input
-                        type="date"
-                        value={followUpDate}
-                        onChange={(event) => setFollowUpDate(event.target.value)}
-                      />
-                    </label>
-
-                    <button
-                      className="secondary-btn full"
-                      onClick={saveFollowUpDate}
-                    >
-                      Save Follow-up
-                    </button>
-
-                    <button
-                      className="primary-btn full"
-                      onClick={markProposalSent}
-                    >
-                      Mark Proposal Sent
-                    </button>
-                  </div>
-
-                  <div className="notes-box">
-                    <label>
-                      Add Note
-                      <textarea
-                        value={leadNoteText}
-                        onChange={(event) => setLeadNoteText(event.target.value)}
-                        placeholder="Example: Sent email today. Follow up Friday. Interested in a $899 website package."
-                        rows="4"
-                      />
-                    </label>
-
-                    <button className="primary-btn full" onClick={addLeadNote}>
-                      Add Note
-                    </button>
-                  </div>
-
-                  <div className="notes-list">
-                    {(selectedLead.notes || []).length === 0 && (
-                      <div className="empty-state">
-                        No notes yet for this lead.
-                      </div>
-                    )}
-
-                    {(selectedLead.notes || []).map((note) => (
-                      <div className="note-item" key={note.id}>
-                        <div>
-                          <strong>{note.date}</strong>
-                          <p>{note.text}</p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => deleteLeadNote(note.id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : (
-              noLeadState
-            )}
-          </section>
+          <PipelineView
+            addLeadNote={addLeadNote}
+            deleteLeadNote={deleteLeadNote}
+            followUpDate={followUpDate}
+            getFollowUpStatus={getFollowUpStatus}
+            leadNoteText={leadNoteText}
+            markProposalSent={markProposalSent}
+            noLeadState={noLeadState}
+            saveFollowUpDate={saveFollowUpDate}
+            selectedLead={selectedLead}
+            setFollowUpDate={setFollowUpDate}
+            setLeadNoteText={setLeadNoteText}
+            updateLeadStatus={updateLeadStatus}
+          />
         )}
-
         {/* ===================== SETTINGS ===================== */}
         {activeView === "settings" && (
-          <section className="view-grid">
-            <div className="card">
-              <h3>Lead Management</h3>
-              <p className="muted">
-                {selectedLead
-                  ? `Edit or remove ${selectedLead.name}.`
-                  : "Select a lead to edit or remove it."}
-              </p>
-
-              <div className="lead-management-actions">
-                <button
-                  className="secondary-btn full"
-                  onClick={startEditLead}
-                  disabled={!selectedLead}
-                >
-                  Edit Lead
-                </button>
-
-                <button
-                  className="danger-btn full"
-                  onClick={deleteSelectedLead}
-                  disabled={!selectedLead}
-                >
-                  Delete Lead
-                </button>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3>Data &amp; Backup</h3>
-              <p className="muted">
-                Your leads live in this browser. Back them up or move them to
-                another device.
-              </p>
-
-              <div className="lead-management-actions">
-                <button className="secondary-btn full" onClick={exportLeadsCsv}>
-                  Export CSV
-                </button>
-                <button
-                  className="secondary-btn full"
-                  onClick={exportPrivateBackup}
-                >
-                  Export Full Backup
-                </button>
-                <button
-                  className="secondary-btn full"
-                  onClick={triggerImportBackup}
-                >
-                  Import Backup
-                </button>
-                <button className="danger-btn full" onClick={clearSavedData}>
-                  Reset All Data
-                </button>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3>Backend Connection</h3>
-              <p className="muted">
-                The Express server proxies every Outscraper call. Searching and
-                enrichment only work while it is running.
-              </p>
-
-              <div className={`backend-status ${backendStatus.state}`}>
-                <span className="backend-status-dot" aria-hidden="true" />
-                <span>
-                  {backendStatus.state === "online"
-                    ? "Online"
-                    : backendStatus.state === "offline"
-                    ? "Offline"
-                    : "Checking"}{" "}
-                  — {backendStatus.message}
-                </span>
-              </div>
-
-              <div className="lead-management-actions">
-                <button
-                  type="button"
-                  className="secondary-btn full"
-                  onClick={async () => {
-                    const isOnline = await checkBackendConnection();
-                    if (isOnline) {
-                      await syncSafeModeLimits();
-                      notify("Backend connected.", "success");
-                    } else {
-                      notify("Backend is not responding.", "error");
-                    }
-                  }}
-                  disabled={backendStatus.state === "checking"}
-                >
-                  {backendStatus.state === "checking"
-                    ? "Checking..."
-                    : "Test Connection"}
-                </button>
-              </div>
-
-              <div className="backend-status">
-                <span>
-                  Safe Mode limits in use — city emails:{" "}
-                  {safeModeLimits.singleCityEmailLimit} · All USA emails:{" "}
-                  {safeModeLimits.allUsaEmailLimit} · city search:{" "}
-                  {safeModeLimits.normalSearchLimit} · All USA search:{" "}
-                  {safeModeLimits.allUsaNormalSearchLimit}
-                </span>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3>Appearance</h3>
-              <p className="muted">Switch between light and dark mode.</p>
-              <div className="lead-management-actions">
-                <button
-                  type="button"
-                  className="secondary-btn full"
-                  onClick={toggleTheme}
-                >
-                  {theme === "dark"
-                    ? "Switch to Light Mode"
-                    : "Switch to Dark Mode"}
-                </button>
-              </div>
-            </div>
-          </section>
+          <SettingsView
+            backendStatus={backendStatus}
+            checkBackendConnection={checkBackendConnection}
+            clearSavedData={clearSavedData}
+            deleteSelectedLead={deleteSelectedLead}
+            exportLeadsCsv={exportLeadsCsv}
+            exportPrivateBackup={exportPrivateBackup}
+            notify={notify}
+            safeModeLimits={safeModeLimits}
+            selectedLead={selectedLead}
+            startEditLead={startEditLead}
+            syncSafeModeLimits={syncSafeModeLimits}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            triggerImportBackup={triggerImportBackup}
+          />
         )}
       </section>
 
       {/* ===================== TOASTS ===================== */}
-      <div className="toast-stack">
-        {toasts.map((toast) => (
-          <div className={`toast toast-${toast.tone}`} key={toast.id}>
-            {toast.message}
-          </div>
-        ))}
-      </div>
+      <ToastStack toasts={toasts} />
     </main>
   );
 }
 
-function StatCard({ title, value }) {
-  return (
-    <div className="stat-card">
-      <p>{title}</p>
-      <h3>{value}</h3>
-    </div>
-  );
-}
