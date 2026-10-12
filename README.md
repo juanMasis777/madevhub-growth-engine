@@ -1,5 +1,11 @@
 # MADEVHUB Growth Engine
 
+[![CI](https://github.com/juanMasis777/madevhub-growth-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/juanMasis777/madevhub-growth-engine/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
+**[▶ Probar la demo](https://madevhub-growth-engine-1enx.vercel.app)** — se abre con
+un pipeline de ejemplo cargado, sin necesidad de registro ni clave de API.
+
 CRM ligero de generación de leads locales. Busca negocios en Google Maps
 (vía [Outscraper](https://outscraper.com)), enriquece sus datos de contacto
 (email y redes sociales), genera auditorías y mensajes de outreach, y te ayuda
@@ -10,6 +16,21 @@ locales: **encuentra negocios que necesitan una web, genera la propuesta y cierr
 
 ---
 
+## Probar sin configurar nada
+
+La primera vez que abres la app sin datos guardados, el CRM siembra **12 leads
+de ejemplo** (ficticios, de negocios de Miami) que cubren las seis etapas del
+pipeline. Así puedes recorrer el dashboard, las auditorías, los mensajes y el
+pipeline sin montar el backend ni gastar créditos de Outscraper.
+
+Un banner los identifica como datos de prueba y los elimina en un clic. Una vez
+borrados no vuelven, ni siquiera al recargar.
+
+Lo único que necesita el backend es la **búsqueda real** de negocios en Google
+Maps; todo lo demás funciona en local.
+
+---
+
 ## Stack
 
 | Capa      | Tecnología                                             |
@@ -17,7 +38,9 @@ locales: **encuentra negocios que necesitan una web, genera la propuesta y cierr
 | Frontend  | React 19 + Vite 8, `lucide-react`, `jspdf`             |
 | Backend   | Express 5 (proxy a Outscraper) con Helmet + rate-limit |
 | Datos     | `localStorage` en el navegador (+ backup/restore JSON) |
+| Tests     | Vitest (79 casos sobre la lógica pura)                 |
 | Lint      | Oxlint                                                  |
+| CI        | GitHub Actions (lint + tests + build)                   |
 
 ---
 
@@ -71,6 +94,8 @@ npm run dev          # solo frontend
 | `npm run dev`     | Frontend Vite con HMR                          |
 | `npm run server`  | Backend Express                                |
 | `npm run dev:all` | Backend + frontend simultáneos (concurrently)  |
+| `npm test`        | Ejecuta la suite de Vitest                     |
+| `npm run test:watch` | Vitest en modo watch                        |
 | `npm run lint`    | Oxlint sobre todo el proyecto                  |
 | `npm run lint:fix`| Oxlint aplicando las correcciones automáticas  |
 | `npm run build`   | Build de producción del frontend               |
@@ -83,15 +108,24 @@ npm run dev          # solo frontend
 ```
 madevhub-growth-engine/
 ├── server/
-│   └── index.js        # API Express: proxy seguro a Outscraper
+│   ├── index.js        # API Express: rutas y proxy seguro a Outscraper
+│   └── lib.js          # Parsing de Outscraper, filtrado de emails, scoring
 ├── src/
-│   ├── App.jsx         # Aplicación React (CRM completo, 7 vistas)
+│   ├── App.jsx         # Estado del CRM y handlers
+│   ├── components/     # Una vista por archivo + Sidebar, Topbar, toasts
+│   ├── lib/            # Lógica pura: constantes, scoring, plantillas,
+│   │                   #   plan de acción, exportaciones, datos demo
 │   ├── App.css         # Sistema de diseño (glass premium, claro/oscuro)
-│   ├── index.css       # Estilos base globales
 │   └── useTheme.js     # Hook de tema claro/oscuro
-├── public/             # Assets estáticos
+├── .github/workflows/  # CI
+├── render.yaml         # Blueprint de despliegue del backend
 └── .env.example        # Plantilla de variables de entorno
 ```
+
+La lógica que no depende de React ni del DOM vive en `src/lib/` y `server/lib.js`.
+Esa separación es lo que permite que la suite de tests cubra el scoring de leads,
+el filtrado de emails, las plantillas de outreach y el export CSV sin montar un
+servidor ni renderizar la app.
 
 ### Vistas de la app
 
@@ -160,6 +194,52 @@ Outscraper**, así que el backend incluye varias capas de protección:
 
 ---
 
+## Despliegue
+
+El proyecto son dos piezas que se despliegan por separado: un frontend estático
+y un backend que guarda la clave de Outscraper.
+
+### 1. Backend (Render)
+
+El repo incluye [`render.yaml`](./render.yaml), así que basta con un Blueprint:
+
+1. En Render: **New → Blueprint** y elige este repositorio.
+2. Render detecta el archivo y crea el servicio `madevhub-growth-engine-api`.
+3. En **Environment**, rellena los valores marcados como secretos:
+
+   | Variable | Valor |
+   | --- | --- |
+   | `OUTSCRAPER_API_KEY` | Tu clave de Outscraper |
+   | `FRONTEND_URL` | La URL del frontend, p. ej. `https://tuapp.vercel.app` |
+   | `API_ACCESS_TOKEN` | Un token generado con `openssl rand -hex 32` |
+
+4. Comprueba que `https://tu-servicio.onrender.com/api/health` responde.
+
+> El plan gratuito de Render duerme el servicio tras un rato sin tráfico; la
+> primera petición después de dormir tarda unos segundos en responder.
+
+### 2. Frontend (Vercel)
+
+1. Importa el repositorio en Vercel. Detecta Vite automáticamente.
+2. En **Settings → Environment Variables** añade:
+
+   | Variable | Valor |
+   | --- | --- |
+   | `VITE_API_URL` | La URL del backend en Render |
+   | `VITE_API_ACCESS_TOKEN` | El mismo token que pusiste en `API_ACCESS_TOKEN` |
+
+3. Vuelve a desplegar para que el build recoja las variables.
+
+Sin `VITE_API_URL` el frontend apunta a `http://localhost:4000`: la app sigue
+funcionando con los datos de ejemplo, pero la búsqueda real de leads falla.
+
+Un recordatorio sobre `VITE_API_ACCESS_TOKEN`: al ser una app de navegador, ese
+valor queda visible en el bundle. Sirve para frenar el abuso casual y poder
+rotarlo; la protección real es la combinación de CORS restringido, rate limiting
+y token.
+
+---
+
 ## Datos y backup
 
 Los leads se guardan en el `localStorage` del navegador. Usa los botones
@@ -179,3 +259,9 @@ frontend.
 `jspdf` (y sus dependencias `html2canvas` + `dompurify`, ~380 kB) se carga de
 forma diferida, solo cuando exportas un PDF. El bundle inicial del CRM queda en
 torno a 255 kB (78 kB gzip).
+
+---
+
+## Licencia
+
+[MIT](./LICENSE) © Juan Masis
