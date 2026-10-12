@@ -1,29 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Building2,
-  Mail,
-  Send,
-  MessageCircle,
-  Phone,
-  Copy,
-  Clock,
-  Sun,
-  Moon,
-} from "lucide-react";
+import { Building2 } from "lucide-react";
 import { useTheme } from "./useTheme";
 import {
   STORAGE_KEYS,
   SAFE_MODE_CONFIG,
-  CITY_OPTIONS,
   VIEW_META,
   PIPELINE_STAGES,
   emptyLeadForm,
-  OUTREACH_STEPS,
 } from "./lib/constants.js";
-import { NAV_ITEMS } from "./lib/navigation.js";
 import {
   getDefaultContactMode,
-  getActionLabel,
   convertLeadToForm,
   createSafeFileName,
   getTodayDateKey,
@@ -35,6 +21,17 @@ import { loadFromLocalStorage, loadInitialLeads } from "./lib/storage.js";
 import { isDemoLead } from "./lib/demoLeads.js";
 import { API_URL, authHeaders } from "./lib/api.js";
 import { loadJsPdf } from "./lib/pdf.js";
+import Sidebar from "./components/Sidebar.jsx";
+import Topbar from "./components/Topbar.jsx";
+import DemoBanner from "./components/DemoBanner.jsx";
+import ToastStack from "./components/ToastStack.jsx";
+import DashboardView from "./components/DashboardView.jsx";
+import SearchView from "./components/SearchView.jsx";
+import LeadsView from "./components/LeadsView.jsx";
+import AuditsView from "./components/AuditsView.jsx";
+import MessagesView from "./components/MessagesView.jsx";
+import PipelineView from "./components/PipelineView.jsx";
+import SettingsView from "./components/SettingsView.jsx";
 import "./App.css";
 
 export default function App() {
@@ -2031,36 +2028,7 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
   return (
     <main className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-icon">M</div>
-          <div>
-            <h1>MADEVHUB</h1>
-            <p>AI Growth Engine</p>
-          </div>
-        </div>
-
-        <nav className="nav">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={activeView === item.id ? "active" : ""}
-                onClick={() => setActiveView(item.id)}
-              >
-                <Icon size={18} /> {item.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-box">
-          <p>Find businesses. Generate audits. Close more clients.</p>
-          <button onClick={() => setActiveView("search")}>Find New Leads</button>
-        </div>
-      </aside>
+      <Sidebar activeView={activeView} setActiveView={setActiveView} />
 
       <section className="content">
         <input
@@ -2071,1074 +2039,145 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
           onChange={importPrivateBackup}
         />
 
-        <header className="topbar">
-          <div>
-            <h2>{currentMeta.title}</h2>
-            <p>{currentMeta.subtitle}</p>
-            <div className="safe-mode-badge">
-              Safe Mode ON · City emails: {safeModeLimits.singleCityEmailLimit}{" "}
-              · All USA emails: {safeModeLimits.allUsaEmailLimit}
-            </div>
-          </div>
-
-          <div className="topbar-actions">
-            <button type="button" className="theme-toggle" onClick={toggleTheme}>
-              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-              {theme === "dark" ? "Claro" : "Oscuro"}
-            </button>
-
-            <button className="primary-btn" onClick={startAddLead}>
-              {showLeadForm && editingLeadId === null ? "Close Form" : "Add Lead"}
-            </button>
-
-            <button className="secondary-btn" onClick={exportLeadsCsv}>
-              Export CSV
-            </button>
-          </div>
-        </header>
+        <Topbar
+          currentMeta={currentMeta}
+          safeModeLimits={safeModeLimits}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          startAddLead={startAddLead}
+          showLeadForm={showLeadForm}
+          editingLeadId={editingLeadId}
+          exportLeadsCsv={exportLeadsCsv}
+        />
 
         {demoLeadCount > 0 && (
-          <div className="demo-banner" role="status">
-            <div className="demo-banner-text">
-              <strong>Demo data</strong>
-              <span>
-                {demoLeadCount} sample {demoLeadCount === 1 ? "lead" : "leads"}{" "}
-                are loaded so you can try the CRM right away. Searching real
-                businesses needs the backend running with your Outscraper key.
-              </span>
-            </div>
-            <button
-              type="button"
-              className="secondary-btn"
-              onClick={clearDemoLeads}
-            >
-              Clear demo data
-            </button>
-          </div>
+          <DemoBanner
+            demoLeadCount={demoLeadCount}
+            clearDemoLeads={clearDemoLeads}
+          />
         )}
 
         {/* ===================== DASHBOARD ===================== */}
         {activeView === "dashboard" && (
-          <>
-            <section className="daily-dashboard">
-              <div className="daily-dashboard-header">
-                <div>
-                  <h3>Today's Action Plan</h3>
-                  <p>
-                    The leads that need you right now, grouped by what to do
-                    next.
-                  </p>
-                </div>
-                <span>
-                  {todayActionCount}{" "}
-                  {todayActionCount === 1 ? "action" : "actions"} pending
-                </span>
-              </div>
-
-              <div className="daily-action-grid">
-                {todayActionGroups.map((group) => (
-                  <div className="daily-action-card" key={group.id}>
-                    <div className="daily-action-card-header">
-                      <span aria-hidden="true">{group.icon}</span>
-                      <div>
-                        <strong>{group.title}</strong>
-                        <small>
-                          {group.leads.length} · {group.subtitle}
-                        </small>
-                      </div>
-                    </div>
-
-                    <div className="daily-action-list">
-                      {group.leads.length === 0 && <p>{group.emptyText}</p>}
-
-                      {group.leads.slice(0, 4).map((lead) => (
-                        <button
-                          type="button"
-                          key={lead.id}
-                          onClick={() => openLeadInView(lead, group.view)}
-                        >
-                          <span>
-                            <strong>{lead.name}</strong>
-                            <small>
-                              {lead.category} · {lead.city}
-                            </small>
-                          </span>
-                          <em>{group.tag(lead)}</em>
-                        </button>
-                      ))}
-
-                      {group.leads.length > 4 && (
-                        <button
-                          type="button"
-                          className="daily-more"
-                          onClick={() => setActiveView("leads")}
-                        >
-                          <span>
-                            <strong>
-                              +{group.leads.length - 4} more
-                            </strong>
-                          </span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="stats-grid">
-              <StatCard title="Total Leads" value={stats.total} />
-              <StatCard title="Hot Leads" value={stats.hotLeads} />
-              <StatCard title="Contacted" value={stats.contacted} />
-              <StatCard title="Closed Deals" value={stats.closed} />
-            </section>
-
-            <section className="view-grid">
-              <div className="card">
-                <div className="card-header">
-                  <div>
-                    <h3>Pipeline Overview</h3>
-                    <p className="muted">
-                      {leadsWithEmail} of {leads.length} leads have an email (
-                      {emailRate}%).
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pipeline-board">
-                  {pipelineCounts.map(({ stage, count }) => (
-                    <div className="pipeline-stat" key={stage}>
-                      <span className="pipeline-stat-count">{count}</span>
-                      <span className="pipeline-stat-label">{stage}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="quick-actions">
-                  <button
-                    className="primary-btn"
-                    onClick={() => setActiveView("search")}
-                  >
-                    Search New Leads
-                  </button>
-                  <button
-                    className="secondary-btn"
-                    onClick={() => setActiveView("leads")}
-                  >
-                    View All Businesses
-                  </button>
-                </div>
-              </div>
-
-              <div className="card">
-                <h3>Activity Log</h3>
-                <p className="muted">
-                  Recent messages, calls, and outreach actions.
-                </p>
-
-                <div className="log-list">
-                  {activityLog.length === 0 && (
-                    <div className="empty-state">
-                      No activity yet. Add a lead, send a message, or generate an
-                      audit to create a log.
-                    </div>
-                  )}
-
-                  {activityLog.slice(0, 12).map((item) => (
-                    <div className="log-item" key={item.id}>
-                      <div>
-                        <strong>{item.businessName}</strong>
-                        <p>{item.action}</p>
-                      </div>
-                      <small>
-                        <Clock size={14} />
-                        {item.date}
-                      </small>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          </>
+          <DashboardView
+            activityLog={activityLog}
+            emailRate={emailRate}
+            leads={leads}
+            leadsWithEmail={leadsWithEmail}
+            openLeadInView={openLeadInView}
+            pipelineCounts={pipelineCounts}
+            setActiveView={setActiveView}
+            stats={stats}
+            todayActionCount={todayActionCount}
+            todayActionGroups={todayActionGroups}
+          />
         )}
-
         {/* ===================== SEARCH ===================== */}
         {activeView === "search" && (
-          <section className="view-grid single">
-            <div className="card" id="search-leads">
-              <div className="card-header">
-                <div>
-                  <h3>Search Businesses</h3>
-                  <p>
-                    Find businesses that need a website or better online
-                    presence.
-                  </p>
-                </div>
-              </div>
-
-              <div className="safe-mode-card">
-                <strong>Safe Mode ON:</strong> normal searches are limited, and
-                email enrichment is capped to protect your Outscraper credits.
-              </div>
-
-              <div className="filters">
-                <label>
-                  City
-                  <select value={city} onChange={(e) => setCity(e.target.value)}>
-                    {CITY_OPTIONS.map((cityOption) => (
-                      <option key={cityOption}>{cityOption}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Category
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                  >
-                    <option>All</option>
-                    <option>Barbershop</option>
-                    <option>Beauty Salon</option>
-                    <option>Cleaning Company</option>
-                    <option>Restaurant</option>
-                    <option>Dentist</option>
-                    <option>Contractor</option>
-                    <option>Real Estate</option>
-                  </select>
-                </label>
-
-                <label>
-                  Website Status
-                  <select
-                    value={websiteStatus}
-                    onChange={(e) => setWebsiteStatus(e.target.value)}
-                  >
-                    <option>Any</option>
-                    <option>No Website</option>
-                    <option>Old Website</option>
-                    <option>Facebook Only</option>
-                    <option>Has Website</option>
-                  </select>
-                </label>
-
-                <div className="filter-actions">
-                  <button
-                    className="primary-btn"
-                    onClick={handleFindLeads}
-                    disabled={isSearching || isSearchingEmails}
-                  >
-                    {isSearching ? "Searching..." : "Find Leads"}
-                  </button>
-
-                  <button
-                    className="secondary-btn"
-                    onClick={handleFindLeadsWithEmails}
-                    disabled={isSearching || isSearchingEmails}
-                  >
-                    {isSearchingEmails
-                      ? "Finding Emails..."
-                      : "Find Leads With Emails"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="quality-filter-row">
-                <button
-                  type="button"
-                  className={`secondary-btn ${
-                    hotLeadsOnly ? "active-filter" : ""
-                  }`}
-                  onClick={() => setHotLeadsOnly((current) => !current)}
-                >
-                  {hotLeadsOnly ? "Showing Hot Leads Only" : "Show Hot Leads Only"}
-                </button>
-
-                <span>Hot Leads are the best prospects to contact first.</span>
-              </div>
-            </div>
-
-            <div className="card private-tools-card">
-              <h3>Add a Lead Manually</h3>
-              <p className="muted">
-                Don't want to spend credits? Add a business by hand and work it
-                like any other lead.
-              </p>
-              <div className="private-tools-grid">
-                <button className="primary-btn" onClick={startAddLead}>
-                  Add Lead Manually
-                </button>
-                <button
-                  className="secondary-btn"
-                  onClick={() => setActiveView("leads")}
-                >
-                  View Businesses
-                </button>
-              </div>
-            </div>
-          </section>
+          <SearchView
+            category={category}
+            city={city}
+            handleFindLeads={handleFindLeads}
+            handleFindLeadsWithEmails={handleFindLeadsWithEmails}
+            hotLeadsOnly={hotLeadsOnly}
+            isSearching={isSearching}
+            isSearchingEmails={isSearchingEmails}
+            setActiveView={setActiveView}
+            setCategory={setCategory}
+            setCity={setCity}
+            setHotLeadsOnly={setHotLeadsOnly}
+            setWebsiteStatus={setWebsiteStatus}
+            startAddLead={startAddLead}
+            websiteStatus={websiteStatus}
+          />
         )}
-
         {/* ===================== BUSINESSES / LEADS ===================== */}
         {activeView === "leads" && (
-          <section className="main-grid">
-            <div className="left-panel">
-              {leadFormCard}
-
-              <div className="card" id="businesses">
-                <div className="card-header with-search">
-                  <h3>
-                    {filteredLeads.length}{" "}
-                    {filteredLeads.length === 1 ? "Lead" : "Leads"} Found
-                  </h3>
-                  {leadSearch && (
-                    <button
-                      type="button"
-                      className="secondary-btn"
-                      onClick={() => setLeadSearch("")}
-                    >
-                      Clear search
-                    </button>
-                  )}
-                </div>
-
-                <div className="filters lead-search-row">
-                  <label>
-                    Search
-                    <input
-                      type="search"
-                      value={leadSearch}
-                      onChange={(event) => setLeadSearch(event.target.value)}
-                      placeholder="Search by name, email, phone, city or category"
-                    />
-                  </label>
-                </div>
-
-                <div className="table">
-                  <div className="table-row table-head">
-                    <span>Business</span>
-                    <span>Quality</span>
-                    <span>Website</span>
-                    <span>Email</span>
-                    <span>Rating</span>
-                    <span>Score</span>
-                    <span>Status</span>
-                  </div>
-
-                  {filteredLeads.map((lead) => (
-                    <button
-                      key={lead.id}
-                      className={`table-row lead-row ${
-                        selectedLead?.id === lead.id ? "selected" : ""
-                      }`}
-                      onClick={() => handleSelectLead(lead)}
-                    >
-                      <span>
-                        <strong>{lead.name}</strong>
-                        <small>
-                          {lead.category} · {lead.city}
-                        </small>
-                        {lead.followUpDate && (
-                          <small
-                            className={`followup-inline ${getFollowUpStatus(lead)
-                              .toLowerCase()
-                              .replace(" ", "-")}`}
-                          >
-                            Follow-up: {lead.followUpDate} ·{" "}
-                            {getFollowUpStatus(lead)}
-                          </small>
-                        )}
-                      </span>
-
-                      <span
-                        className={`quality-badge ${
-                          getLeadQuality(lead).className
-                        }`}
-                      >
-                        {getLeadQuality(lead).emoji} {getLeadQuality(lead).label}
-                      </span>
-
-                      <span>{lead.website}</span>
-                      <span
-                        className={lead.email ? "email-found" : "email-missing"}
-                      >
-                        {lead.email ? lead.email : "No email"}
-                      </span>
-                      <span>{lead.rating} ⭐</span>
-                      <span className="score">{lead.opportunityScore}%</span>
-                      <span className="status">{lead.status}</span>
-                    </button>
-                  ))}
-
-                  {filteredLeads.length === 0 && (
-                    <div className="empty-state">
-                      {leads.length === 0
-                        ? "No leads yet. Head to Search Leads to find businesses, or add one manually."
-                        : "No leads match these filters. Try clearing the search or the filters in Search Leads."}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <aside className="right-panel">
-              {selectedLead ? (
-                <div className="card lead-detail-card">
-                  <div className="lead-detail-head">
-                    <div>
-                      <h3>{selectedLead.name}</h3>
-                      <p className="muted">
-                        {selectedLead.category} · {selectedLead.city}
-                      </p>
-                    </div>
-                    <span
-                      className={`quality-badge ${
-                        getLeadQuality(selectedLead).className
-                      }`}
-                    >
-                      {getLeadQuality(selectedLead).emoji}{" "}
-                      {getLeadQuality(selectedLead).label}
-                    </span>
-                  </div>
-
-                  <div className="score-circle">
-                    {selectedLead.opportunityScore}%
-                  </div>
-
-                  <ul className="detail-facts">
-                    <li>
-                      <span>Website</span>
-                      <strong>{selectedLead.website}</strong>
-                    </li>
-                    <li>
-                      <span>Email</span>
-                      <strong>{selectedLead.email || "Not found"}</strong>
-                    </li>
-                    <li>
-                      <span>Phone</span>
-                      <strong>{selectedLead.phone || "Not found"}</strong>
-                    </li>
-                    <li>
-                      <span>Rating</span>
-                      <strong>
-                        {selectedLead.rating} ⭐ ({selectedLead.reviews})
-                      </strong>
-                    </li>
-                    <li>
-                      <span>Status</span>
-                      <strong>{selectedLead.status}</strong>
-                    </li>
-                  </ul>
-
-                  <div className="detail-actions">
-                    <button
-                      className="primary-btn full"
-                      onClick={() => setActiveView("audits")}
-                    >
-                      Open Audit
-                    </button>
-                    <button
-                      className="secondary-btn full"
-                      onClick={() => setActiveView("messages")}
-                    >
-                      Write Message
-                    </button>
-                    <button
-                      className="secondary-btn full"
-                      onClick={() => setActiveView("pipeline")}
-                    >
-                      Update Pipeline
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="card">
-                  <h3>No Lead Selected</h3>
-                  <p className="muted">Add or select a lead to see details.</p>
-                </div>
-              )}
-            </aside>
-          </section>
+          <LeadsView
+            filteredLeads={filteredLeads}
+            getFollowUpStatus={getFollowUpStatus}
+            handleSelectLead={handleSelectLead}
+            leadFormCard={leadFormCard}
+            leadSearch={leadSearch}
+            leads={leads}
+            selectedLead={selectedLead}
+            setActiveView={setActiveView}
+            setLeadSearch={setLeadSearch}
+          />
         )}
-
         {/* ===================== AUDITS ===================== */}
         {activeView === "audits" && (
-          <section className="view-grid single">
-            {selectedLead ? (
-              <div className="card" id="audits">
-                <h3>AI Audit Preview</h3>
-                <p className="muted">{selectedLead.name}</p>
-
-                <div className="score-circle">
-                  {selectedLead.opportunityScore}%
-                </div>
-
-                <ul className="audit-list">
-                  <li>
-                    Lead quality:{" "}
-                    <span
-                      className={`quality-badge ${
-                        getLeadQuality(selectedLead).className
-                      }`}
-                    >
-                      {getLeadQuality(selectedLead).emoji}{" "}
-                      {getLeadQuality(selectedLead).label} (
-                      {getLeadQuality(selectedLead).score}/100)
-                    </span>
-                  </li>
-
-                  <li>
-                    Follow-up:{" "}
-                    {selectedLead.followUpDate
-                      ? `${selectedLead.followUpDate} · ${getFollowUpStatus(
-                          selectedLead
-                        )}`
-                      : "Not scheduled"}
-                  </li>
-
-                  <li>
-                    Proposal sent:{" "}
-                    {selectedLead.proposalSentDate
-                      ? selectedLead.proposalSentDate
-                      : "Not sent"}
-                  </li>
-
-                  <li>Website status: {selectedLead.website}</li>
-                  <li>Google rating: {selectedLead.rating}</li>
-                  <li>Reviews: {selectedLead.reviews}</li>
-
-                  <li>
-                    Phone: {selectedLead.phone ? selectedLead.phone : "Not found"}
-                  </li>
-
-                  <li>
-                    Email: {selectedLead.email ? selectedLead.email : "Not found"}
-                  </li>
-
-                  <li>
-                    Instagram:{" "}
-                    {selectedLead.instagram
-                      ? selectedLead.instagram
-                      : "Not found"}
-                  </li>
-
-                  <li>
-                    Address:{" "}
-                    {selectedLead.address ? selectedLead.address : "Not found"}
-                  </li>
-
-                  <li>
-                    Website URL:{" "}
-                    {selectedLead.websiteUrl ? (
-                      <a
-                        href={selectedLead.websiteUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open Website
-                      </a>
-                    ) : (
-                      "Not found"
-                    )}
-                  </li>
-
-                  <li>
-                    Google Maps:{" "}
-                    {selectedLead.googleMapsUrl ? (
-                      <a
-                        href={selectedLead.googleMapsUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open Maps
-                      </a>
-                    ) : (
-                      "Not found"
-                    )}
-                  </li>
-
-                  <li>
-                    Facebook:{" "}
-                    {selectedLead.facebook ? (
-                      <a
-                        href={selectedLead.facebook}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open Facebook
-                      </a>
-                    ) : (
-                      "Not found"
-                    )}
-                  </li>
-
-                  <li>
-                    LinkedIn:{" "}
-                    {selectedLead.linkedin ? (
-                      <a
-                        href={selectedLead.linkedin}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open LinkedIn
-                      </a>
-                    ) : (
-                      "Not found"
-                    )}
-                  </li>
-
-                  <li>
-                    WhatsApp:{" "}
-                    {selectedLead.whatsapp ? selectedLead.whatsapp : "Not found"}
-                  </li>
-                </ul>
-
-                <div className="audit-buttons">
-                  <button className="primary-btn full" onClick={generateAudit}>
-                    Generate Audit
-                  </button>
-
-                  <button
-                    className="secondary-btn full"
-                    onClick={handleEnrichLead}
-                    disabled={isEnriching || !selectedLead.websiteUrl}
-                  >
-                    {isEnriching ? "Finding..." : "Find Email / Socials"}
-                  </button>
-
-                  <button className="secondary-btn full" onClick={exportAudit}>
-                    Export TXT
-                  </button>
-
-                  <button className="secondary-btn full" onClick={exportAuditPdf}>
-                    Export PDF
-                  </button>
-
-                  <button
-                    className="primary-btn full"
-                    onClick={createClientProposalPdf}
-                  >
-                    Create Client Proposal
-                  </button>
-                </div>
-
-                {generatedAudit && (
-                  <div className="audit-report">
-                    <h4>Generated Audit</h4>
-                    <p>{generatedAudit}</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              noLeadState
-            )}
-          </section>
+          <AuditsView
+            createClientProposalPdf={createClientProposalPdf}
+            exportAudit={exportAudit}
+            exportAuditPdf={exportAuditPdf}
+            generateAudit={generateAudit}
+            generatedAudit={generatedAudit}
+            getFollowUpStatus={getFollowUpStatus}
+            handleEnrichLead={handleEnrichLead}
+            isEnriching={isEnriching}
+            noLeadState={noLeadState}
+            selectedLead={selectedLead}
+          />
         )}
-
         {/* ===================== MESSAGES ===================== */}
         {activeView === "messages" && (
-          <section className="view-grid single">
-            {selectedLead ? (
-              <>
-                <div className="card">
-                  <h3>Contact Actions</h3>
-                  <p className="muted">
-                    Choose the best way to contact {selectedLead.name}.
-                  </p>
-
-                  <div className="contact-actions">
-                    <button
-                      className={contactMode === "email" ? "active" : ""}
-                      disabled={!selectedLead.email}
-                      onClick={() => setContactMode("email")}
-                    >
-                      <Mail size={16} />
-                      Email
-                    </button>
-
-                    <button
-                      className={contactMode === "instagram" ? "active" : ""}
-                      disabled={!selectedLead.instagram}
-                      onClick={() => setContactMode("instagram")}
-                    >
-                      <MessageCircle size={16} />
-                      Instagram
-                    </button>
-
-                    <button
-                      className={contactMode === "call" ? "active" : ""}
-                      disabled={!selectedLead.phone}
-                      onClick={() => setContactMode("call")}
-                    >
-                      <Phone size={16} />
-                      Call
-                    </button>
-                  </div>
-
-                  <div className="contact-info">
-                    <strong>Selected channel:</strong> {contactMode}
-                  </div>
-                </div>
-
-                <div className="card" id="messages">
-                  <h3>Generated Message</h3>
-                  <p className="message-box">{contactMessage}</p>
-
-                  <div className="actions">
-                    <button className="secondary-btn" onClick={copyMessage}>
-                      <Copy size={16} />
-                      Copy
-                    </button>
-
-                    <button className="primary-btn" onClick={handleSendAction}>
-                      <Send size={16} />
-                      {getActionLabel(contactMode)}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="card" id="outreach">
-                  <div className="card-header">
-                    <div>
-                      <h3>Outreach Sequence</h3>
-                      <p className="muted">
-                        Five ready-to-send steps for {selectedLead.name}. Pick
-                        one, copy it, and mark the lead as contacted.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="outreach-grid">
-                    {OUTREACH_STEPS.map((step) => (
-                      <button
-                        key={step.id}
-                        type="button"
-                        className={
-                          outreachTitle === step.label
-                            ? "primary-btn"
-                            : "secondary-btn"
-                        }
-                        onClick={() => generateOutreachSequence(step.id)}
-                      >
-                        {step.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {outreachMessage ? (
-                    <div className="outreach-preview">
-                      <div className="outreach-preview-header">
-                        <strong>{outreachTitle}</strong>
-                        <span>
-                          {getLeadQuality(selectedLead).emoji}{" "}
-                          {getLeadQuality(selectedLead).label}
-                        </span>
-                      </div>
-
-                      <p>{outreachMessage}</p>
-
-                      <div className="actions">
-                        <button
-                          className="secondary-btn"
-                          onClick={copyOutreachMessage}
-                        >
-                          <Copy size={16} />
-                          Copy Message
-                        </button>
-
-                        <button
-                          className="primary-btn"
-                          onClick={markOutreachContacted}
-                        >
-                          <Send size={16} />
-                          Mark as Contacted
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="empty-state">
-                      Pick a step above to generate a personalized message for
-                      this lead.
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              noLeadState
-            )}
-          </section>
+          <MessagesView
+            contactMessage={contactMessage}
+            contactMode={contactMode}
+            copyMessage={copyMessage}
+            copyOutreachMessage={copyOutreachMessage}
+            generateOutreachSequence={generateOutreachSequence}
+            handleSendAction={handleSendAction}
+            markOutreachContacted={markOutreachContacted}
+            noLeadState={noLeadState}
+            outreachMessage={outreachMessage}
+            outreachTitle={outreachTitle}
+            selectedLead={selectedLead}
+            setContactMode={setContactMode}
+          />
         )}
-
         {/* ===================== PIPELINE ===================== */}
         {activeView === "pipeline" && (
-          <section className="view-grid single">
-            {selectedLead ? (
-              <>
-                <div className="card" id="pipeline">
-                  <h3>Pipeline Status — {selectedLead.name}</h3>
-                  <p className="muted">Move this lead through your sales stages.</p>
-
-                  <div className="pipeline-buttons">
-                    {PIPELINE_STAGES.map((status) => (
-                      <button
-                        key={status}
-                        className={
-                          selectedLead.status === status ? "active" : ""
-                        }
-                        onClick={() => updateLeadStatus(selectedLead.id, status)}
-                      >
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="card" id="follow-up">
-                  <h3>Lead Notes &amp; Follow-up</h3>
-                  <p className="muted">
-                    Save notes and schedule the next follow-up for this lead.
-                  </p>
-
-                  <div className="followup-summary">
-                    <div>
-                      <strong>Next Follow-up</strong>
-                      <span>
-                        {selectedLead.followUpDate
-                          ? `${selectedLead.followUpDate} · ${getFollowUpStatus(
-                              selectedLead
-                            )}`
-                          : "Not scheduled"}
-                      </span>
-                    </div>
-
-                    <div>
-                      <strong>Proposal</strong>
-                      <span>
-                        {selectedLead.proposalSentDate
-                          ? `Sent ${selectedLead.proposalSentDate}`
-                          : "Not sent"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="followup-controls">
-                    <label>
-                      Next Follow-up Date
-                      <input
-                        type="date"
-                        value={followUpDate}
-                        onChange={(event) => setFollowUpDate(event.target.value)}
-                      />
-                    </label>
-
-                    <button
-                      className="secondary-btn full"
-                      onClick={saveFollowUpDate}
-                    >
-                      Save Follow-up
-                    </button>
-
-                    <button
-                      className="primary-btn full"
-                      onClick={markProposalSent}
-                    >
-                      Mark Proposal Sent
-                    </button>
-                  </div>
-
-                  <div className="notes-box">
-                    <label>
-                      Add Note
-                      <textarea
-                        value={leadNoteText}
-                        onChange={(event) => setLeadNoteText(event.target.value)}
-                        placeholder="Example: Sent email today. Follow up Friday. Interested in a $899 website package."
-                        rows="4"
-                      />
-                    </label>
-
-                    <button className="primary-btn full" onClick={addLeadNote}>
-                      Add Note
-                    </button>
-                  </div>
-
-                  <div className="notes-list">
-                    {(selectedLead.notes || []).length === 0 && (
-                      <div className="empty-state">
-                        No notes yet for this lead.
-                      </div>
-                    )}
-
-                    {(selectedLead.notes || []).map((note) => (
-                      <div className="note-item" key={note.id}>
-                        <div>
-                          <strong>{note.date}</strong>
-                          <p>{note.text}</p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => deleteLeadNote(note.id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : (
-              noLeadState
-            )}
-          </section>
+          <PipelineView
+            addLeadNote={addLeadNote}
+            deleteLeadNote={deleteLeadNote}
+            followUpDate={followUpDate}
+            getFollowUpStatus={getFollowUpStatus}
+            leadNoteText={leadNoteText}
+            markProposalSent={markProposalSent}
+            noLeadState={noLeadState}
+            saveFollowUpDate={saveFollowUpDate}
+            selectedLead={selectedLead}
+            setFollowUpDate={setFollowUpDate}
+            setLeadNoteText={setLeadNoteText}
+            updateLeadStatus={updateLeadStatus}
+          />
         )}
-
         {/* ===================== SETTINGS ===================== */}
         {activeView === "settings" && (
-          <section className="view-grid">
-            <div className="card">
-              <h3>Lead Management</h3>
-              <p className="muted">
-                {selectedLead
-                  ? `Edit or remove ${selectedLead.name}.`
-                  : "Select a lead to edit or remove it."}
-              </p>
-
-              <div className="lead-management-actions">
-                <button
-                  className="secondary-btn full"
-                  onClick={startEditLead}
-                  disabled={!selectedLead}
-                >
-                  Edit Lead
-                </button>
-
-                <button
-                  className="danger-btn full"
-                  onClick={deleteSelectedLead}
-                  disabled={!selectedLead}
-                >
-                  Delete Lead
-                </button>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3>Data &amp; Backup</h3>
-              <p className="muted">
-                Your leads live in this browser. Back them up or move them to
-                another device.
-              </p>
-
-              <div className="lead-management-actions">
-                <button className="secondary-btn full" onClick={exportLeadsCsv}>
-                  Export CSV
-                </button>
-                <button
-                  className="secondary-btn full"
-                  onClick={exportPrivateBackup}
-                >
-                  Export Full Backup
-                </button>
-                <button
-                  className="secondary-btn full"
-                  onClick={triggerImportBackup}
-                >
-                  Import Backup
-                </button>
-                <button className="danger-btn full" onClick={clearSavedData}>
-                  Reset All Data
-                </button>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3>Backend Connection</h3>
-              <p className="muted">
-                The Express server proxies every Outscraper call. Searching and
-                enrichment only work while it is running.
-              </p>
-
-              <div className={`backend-status ${backendStatus.state}`}>
-                <span className="backend-status-dot" aria-hidden="true" />
-                <span>
-                  {backendStatus.state === "online"
-                    ? "Online"
-                    : backendStatus.state === "offline"
-                    ? "Offline"
-                    : "Checking"}{" "}
-                  — {backendStatus.message}
-                </span>
-              </div>
-
-              <div className="lead-management-actions">
-                <button
-                  type="button"
-                  className="secondary-btn full"
-                  onClick={async () => {
-                    const isOnline = await checkBackendConnection();
-                    if (isOnline) {
-                      await syncSafeModeLimits();
-                      notify("Backend connected.", "success");
-                    } else {
-                      notify("Backend is not responding.", "error");
-                    }
-                  }}
-                  disabled={backendStatus.state === "checking"}
-                >
-                  {backendStatus.state === "checking"
-                    ? "Checking..."
-                    : "Test Connection"}
-                </button>
-              </div>
-
-              <div className="backend-status">
-                <span>
-                  Safe Mode limits in use — city emails:{" "}
-                  {safeModeLimits.singleCityEmailLimit} · All USA emails:{" "}
-                  {safeModeLimits.allUsaEmailLimit} · city search:{" "}
-                  {safeModeLimits.normalSearchLimit} · All USA search:{" "}
-                  {safeModeLimits.allUsaNormalSearchLimit}
-                </span>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3>Appearance</h3>
-              <p className="muted">Switch between light and dark mode.</p>
-              <div className="lead-management-actions">
-                <button
-                  type="button"
-                  className="secondary-btn full"
-                  onClick={toggleTheme}
-                >
-                  {theme === "dark"
-                    ? "Switch to Light Mode"
-                    : "Switch to Dark Mode"}
-                </button>
-              </div>
-            </div>
-          </section>
+          <SettingsView
+            backendStatus={backendStatus}
+            checkBackendConnection={checkBackendConnection}
+            clearSavedData={clearSavedData}
+            deleteSelectedLead={deleteSelectedLead}
+            exportLeadsCsv={exportLeadsCsv}
+            exportPrivateBackup={exportPrivateBackup}
+            notify={notify}
+            safeModeLimits={safeModeLimits}
+            selectedLead={selectedLead}
+            startEditLead={startEditLead}
+            syncSafeModeLimits={syncSafeModeLimits}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            triggerImportBackup={triggerImportBackup}
+          />
         )}
       </section>
 
       {/* ===================== TOASTS ===================== */}
-      <div className="toast-stack">
-        {toasts.map((toast) => (
-          <div className={`toast toast-${toast.tone}`} key={toast.id}>
-            {toast.message}
-          </div>
-        ))}
-      </div>
+      <ToastStack toasts={toasts} />
     </main>
   );
 }
 
-function StatCard({ title, value }) {
-  return (
-    <div className="stat-card">
-      <p>{title}</p>
-      <h3>{value}</h3>
-    </div>
-  );
-}
