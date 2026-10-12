@@ -1,0 +1,41 @@
+# Render blueprint for the Express backend.
+#
+# The frontend is a static Vite build (Vercel, Netlify, any static host).
+# This file deploys only the API that proxies Outscraper, which has to run
+# somewhere with the API key kept server-side.
+#
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repository.
+# Then fill in the values marked `sync: false` under the service's
+# Environment tab — they are secrets and never live in the repo.
+
+services:
+  - type: web
+    name: madevhub-growth-engine-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+
+      # Your Outscraper key. Set it in the dashboard, never here.
+      - key: OUTSCRAPER_API_KEY
+        sync: false
+
+      # The deployed frontend origin, e.g. https://your-app.vercel.app
+      # Without it CORS stays open, which you do not want in production.
+      - key: FRONTEND_URL
+        sync: false
+
+      # Shared token required by the endpoints that spend credits.
+      # Generate one with: openssl rand -hex 32
+      - key: API_ACCESS_TOKEN
+        sync: false
+
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: RATE_LIMIT_MAX
+        value: "60"
