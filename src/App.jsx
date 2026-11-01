@@ -51,7 +51,9 @@ const SAFE_MODE_CONFIG = {
   allUsaNormalSearchLimit: 12,
 };
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+// Vacío = mismo origen (/api lo pasa Vite al backend). Solo pon VITE_API_URL
+// si el backend vive en otro dominio, por ejemplo en producción.
+const API_URL = import.meta.env.VITE_API_URL || "";
 const API_ACCESS_TOKEN = import.meta.env.VITE_API_ACCESS_TOKEN || "";
 
 // Cabeceras con el token de acceso (si está configurado en el .env).
@@ -383,13 +385,13 @@ export default function App() {
 
       setBackendStatus({
         state: "online",
-        message: `Connected to ${API_URL}`,
+        message: `Connected to ${API_URL || "the backend"}`,
       });
       return true;
     } catch {
       setBackendStatus({
         state: "offline",
-        message: `No response from ${API_URL}. Run "npm run server".`,
+        message: `No response from ${API_URL || "the backend"}. Run "npm run dev:all".`,
       });
       return false;
     }
