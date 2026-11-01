@@ -635,7 +635,7 @@ app.get("/api/search-leads", requireAccessToken, async (req, res) => {
     if (!apiKey) {
       return res.status(500).json({
         success: false,
-        message: "Outscraper API key is missing in .env",
+        message: "Outscraper API key is missing. Add OUTSCRAPER_API_KEY to .env (local) or to the Vercel environment variables.",
       });
     }
 
@@ -700,7 +700,7 @@ app.post("/api/enrich-lead", requireAccessToken, async (req, res) => {
     if (!apiKey) {
       return res.status(500).json({
         success: false,
-        message: "Outscraper API key is missing in .env",
+        message: "Outscraper API key is missing. Add OUTSCRAPER_API_KEY to .env (local) or to the Vercel environment variables.",
       });
     }
 
@@ -743,7 +743,7 @@ app.get(
     if (!apiKey) {
       return res.status(500).json({
         success: false,
-        message: "Outscraper API key is missing in .env",
+        message: "Outscraper API key is missing. Add OUTSCRAPER_API_KEY to .env (local) or to the Vercel environment variables.",
       });
     }
 
@@ -871,6 +871,12 @@ app.get(
   }
 );
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+// En Vercel el servidor no "escucha": Vercel importa la app desde
+// api/index.js y la ejecuta como función. En local y en Codespaces sí escucha.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;

@@ -171,6 +171,22 @@ en la cabecera `x-access-token` o `Authorization: Bearer <token>`.
 
 ---
 
+## Publicar en Vercel
+
+El proyecto entero (app + backend) se publica en Vercel desde `main`. El
+backend corre como función: `api/index.js` importa la app Express de
+`server/index.js` y `vercel.json` manda todas las rutas `/api/*` ahí.
+
+Configura en **Vercel → Settings → Environment Variables**:
+
+| Variable             | Valor                                   |
+| -------------------- | --------------------------------------- |
+| `OUTSCRAPER_API_KEY` | Tu clave de Outscraper (obligatoria)    |
+| `VITE_API_URL`       | No la agregues: vacía usa el mismo link |
+
+Después de agregar o cambiar una variable, haz **Redeploy**. La protección de
+Vercel (inicio de sesión) deja la app y la API solo para tu cuenta.
+
 ## Seguridad
 
 Cada llamada a los endpoints de scraping **consume créditos reales de
