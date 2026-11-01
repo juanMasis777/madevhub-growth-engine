@@ -1,0 +1,10 @@
+{
+  "name": "MADEVHUB Growth Engine",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "postCreateCommand": "npm install && (test -f .env || cp .env.example .env)",
+  "forwardPorts": [5173, 4000],
+  "portsAttributes": {
+    "5173": { "label": "App", "onAutoForward": "openBrowser" },
+    "4000": { "label": "Backend", "onAutoForward": "silent" }
+  }
+}
