@@ -86,6 +86,9 @@ madevhub-growth-engine/
 │   └── index.js        # API Express: proxy seguro a Outscraper
 ├── src/
 │   ├── App.jsx         # Aplicación React (CRM completo, 7 vistas)
+│   ├── offer.js        # Precios y paquete de MADEVHUB
+│   ├── templates.js    # Mensajes, auditoría y propuesta (ES / EN)
+│   ├── demoSite.js     # Generador de la página demo del cliente
 │   ├── App.css         # Sistema de diseño (glass premium, claro/oscuro)
 │   ├── index.css       # Estilos base globales
 │   └── useTheme.js     # Hook de tema claro/oscuro
@@ -100,8 +103,8 @@ madevhub-growth-engine/
 | **Dashboard**     | *Today's Action Plan* + métricas, pipeline y log de actividad             |
 | **Search Leads**  | Búsqueda en Google Maps con Safe Mode y alta manual de leads              |
 | **Businesses**    | Lista completa con buscador por nombre, email, teléfono, ciudad o rubro   |
-| **Audits**        | Auditoría de presencia digital, enriquecimiento y export TXT/PDF/propuesta|
-| **Messages**      | Mensaje por canal (email/IG/llamada) + secuencia de outreach de 5 pasos   |
+| **Audits**        | Auditoría, enriquecimiento, propuesta PDF y **página demo** del negocio   |
+| **Messages**      | Mensaje por canal (WhatsApp/email/IG/llamada) + secuencia de 6 pasos      |
 | **Pipeline**      | Estado del lead, fecha de seguimiento y notas                             |
 | **Settings**      | Editar/borrar lead, backup, estado del backend y tema claro/oscuro        |
 
@@ -119,12 +122,39 @@ el pipeline, para no revisar la lista entera a mano:
 Cada tarjeta lleva directo al lead en la vista correcta. Los leads en `Closed`
 o `Lost` quedan fuera del plan.
 
+#### Página demo para el cliente
+
+En **Audits → Demo Website** la app genera una página web de muestra del negocio
+con sus datos reales de Google: nombre, rubro, ciudad, teléfono, calificación,
+reseñas, dirección con mapa y botones de llamar y WhatsApp. El diseño cambia
+según el rubro (barbería, salón, limpieza, restaurante, dentista, contratista,
+bienes raíces o genérico) y sale en el idioma del lead.
+
+1. **Create Demo Website** y revisa la vista previa.
+2. **Download HTML** y arrastra el archivo a [Netlify Drop](https://app.netlify.com/drop)
+   para tener un link público gratis.
+3. Pega el link en **Demo link** y toca **Send on WhatsApp**: se abre WhatsApp
+   con el mensaje listo y el lead pasa a `Contacted`.
+
+#### Idioma y WhatsApp
+
+Cada lead tiene idioma (**ES** por defecto, **EN** opcional) que cambia los
+mensajes, la auditoría, la propuesta PDF y la página demo. El canal
+**WhatsApp** abre `wa.me` con el teléfono del negocio y el mensaje escrito.
+
+#### Precios
+
+La oferta vive en [`src/offer.js`](./src/offer.js): paquete de **$697** (un solo
+pago) y mantenimiento opcional de **$97/mes**. La auditoría, la propuesta PDF y
+los mensajes leen de ahí. La propuesta incluye el link de pago de Stripe.
+
 #### Secuencia de outreach
 
-En **Messages** hay cinco plantillas personalizadas con los datos reales del
-lead (nombre, ciudad, rubro, rating, reseñas y estado de su web): *Initial
-Email*, *Instagram DM*, *Follow-up 1*, *Follow-up 2* y *Call Script*. Se copian
-al portapapeles y marcan el lead como `Contacted` en un clic.
+En **Messages** hay seis plantillas personalizadas con los datos reales del
+lead (nombre, ciudad, rubro, rating, reseñas y estado de su web): *WhatsApp
+inicial*, *Email inicial*, *DM de Instagram*, *Seguimiento 1*, *Seguimiento 2* y
+*Guion de llamada*. Se copian o se abren en WhatsApp, y marcan el lead como
+`Contacted` en un clic.
 
 ### Endpoints del backend
 

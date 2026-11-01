@@ -14,8 +14,26 @@ import {
   Clock,
   Sun,
   Moon,
+  Globe,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 import { useTheme } from "./useTheme";
+import { OFFER, formatPrice } from "./offer";
+import {
+  LANGUAGES,
+  OUTREACH_STEPS,
+  buildAudit,
+  buildContactMessage,
+  buildDemoShareMessage,
+  buildOutreachMessage,
+  buildProposalContent,
+  buildWhatsappUrl,
+  getLeadLanguage,
+  getOutreachStepLabel,
+  getWhatsappNumber,
+} from "./templates";
+import { buildDemoSiteHtml } from "./demoSite";
 import "./App.css";
 
 const STORAGE_KEYS = {
@@ -125,6 +143,7 @@ const emptyLeadForm = {
   rating: "4.5",
   reviews: "0",
   opportunityScore: "90",
+  language: "es",
 };
 
 function loadFromLocalStorage(key, fallbackValue) {
@@ -138,12 +157,14 @@ function loadFromLocalStorage(key, fallbackValue) {
 }
 
 function getDefaultContactMode(lead) {
+  if (getWhatsappNumber(lead)) return "whatsapp";
   if (lead?.email) return "email";
   if (lead?.instagram) return "instagram";
   return "call";
 }
 
 function getActionLabel(contactMode) {
+  if (contactMode === "whatsapp") return "Open WhatsApp";
   if (contactMode === "email") return "Send Email";
   if (contactMode === "instagram") return "Copy Instagram DM";
   return "Save Call Script";
@@ -161,6 +182,7 @@ function convertLeadToForm(lead) {
     rating: String(lead.rating ?? "4.5"),
     reviews: String(lead.reviews ?? "0"),
     opportunityScore: String(lead.opportunityScore ?? "90"),
+    language: getLeadLanguage(lead),
   };
 }
 
@@ -172,14 +194,6 @@ function createSafeFileName(name) {
       .replace(/^-+|-+$/g, "") || "business"
   );
 }
-
-const OUTREACH_STEPS = [
-  { id: "email", label: "Initial Email" },
-  { id: "instagram", label: "Instagram DM" },
-  { id: "followup1", label: "Follow-up 1" },
-  { id: "followup2", label: "Follow-up 2" },
-  { id: "call", label: "Call Script" },
-];
 
 const CLOSED_STATUSES = ["Closed", "Lost"];
 
@@ -315,6 +329,8 @@ export default function App() {
   const [isEnriching, setIsEnriching] = useState(false);
   const [outreachTitle, setOutreachTitle] = useState("");
   const [outreachMessage, setOutreachMessage] = useState("");
+  const [outreachChannel, setOutreachChannel] = useState("");
+  const [demoHtml, setDemoHtml] = useState("");
   const [leadNoteText, setLeadNoteText] = useState("");
   const [followUpDate, setFollowUpDate] = useState("");
   const [activeView, setActiveView] = useState("dashboard");
@@ -608,6 +624,8 @@ export default function App() {
     setGeneratedAudit("");
     setOutreachTitle("");
     setOutreachMessage("");
+    setOutreachChannel("");
+    setDemoHtml("");
     setLeadNoteText("");
     setFollowUpDate(lead.followUpDate || "");
   };
@@ -679,6 +697,8 @@ export default function App() {
     setGeneratedAudit("");
     setOutreachTitle("");
     setOutreachMessage("");
+    setOutreachChannel("");
+    setDemoHtml("");
     setLeadNoteText("");
     setFollowUpDate("");
     resetLeadForm();
@@ -714,6 +734,7 @@ export default function App() {
       rating: Number(leadForm.rating) || 0,
       reviews: Number(leadForm.reviews) || 0,
       opportunityScore: Number(leadForm.opportunityScore) || 0,
+      language: leadForm.language === "en" ? "en" : "es",
     };
 
     if (editingLeadId) {
@@ -1363,6 +1384,8 @@ export default function App() {
         setGeneratedAudit("");
         setOutreachTitle("");
         setOutreachMessage("");
+        setOutreachChannel("");
+        setDemoHtml("");
         setLeadNoteText("");
         setFollowUpDate(firstLead?.followUpDate || "");
         setHotLeadsOnly(false);
@@ -1404,6 +1427,8 @@ export default function App() {
     setGeneratedAudit("");
     setOutreachTitle("");
     setOutreachMessage("");
+    setOutreachChannel("");
+    setDemoHtml("");
     setLeadNoteText("");
     setFollowUpDate("");
     setCity("Miami");
@@ -1413,112 +1438,31 @@ export default function App() {
     resetLeadForm();
   };
 
+  const leadLanguage = getLeadLanguage(selectedLead);
+
+  const setLeadLanguage = (language) => {
+    if (!selectedLead || language === leadLanguage) return;
+    updateSelectedLeadData({ language });
+    setGeneratedAudit("");
+    setOutreachTitle("");
+    setOutreachMessage("");
+    setOutreachChannel("");
+    setDemoHtml("");
+  };
+
   const generateContactMessage = () => {
     if (!selectedLead) return "";
-
-    if (contactMode === "email") {
-      return `Subject: Quick idea for ${selectedLead.name}
-
-Hi ${selectedLead.name},
-
-I found your business online and noticed that your digital presence could be improved. You already have a strong reputation with ${selectedLead.rating} stars and ${selectedLead.reviews} reviews, but I noticed your website status is: ${selectedLead.website}.
-
-At MADEVHUB, we help local businesses get professional websites, better visibility, and more customers.
-
-Would you like me to send you a free digital audit for your business?
-
-Best,
-Juan
-MADEVHUB`;
-    }
-
-    if (contactMode === "instagram") {
-      return `Hi ${selectedLead.name}, I found your business online and noticed you have a strong local presence with ${selectedLead.rating} stars and ${selectedLead.reviews} reviews.
-
-I also noticed your website status is: ${selectedLead.website}.
-
-I help local businesses get professional websites and attract more customers online. Would you like me to send you a free quick digital audit?`;
-    }
-
-    return `Call Script for ${selectedLead.name}
-
-Hi, my name is Juan from MADEVHUB. I found your business online and noticed you have great reviews.
-
-I help local businesses improve their online presence with professional websites, better visibility, and simple automation.
-
-I wanted to ask if you already have someone helping you with your website or online presence?
-
-If not, I can send you a free digital audit showing a few ways your business could attract more local customers.`;
+    return buildContactMessage(selectedLead, contactMode, leadLanguage);
   };
 
   const generateAudit = () => {
     if (!selectedLead) return;
 
-    const websiteProblem =
-      selectedLead.website === "No Website"
-        ? "The business does not have a professional website."
-        : selectedLead.website === "Old Website"
-        ? "The business may have an outdated website that needs improvement."
-        : selectedLead.website === "Facebook Only"
-        ? "The business depends mostly on Facebook instead of having a professional website."
-        : "The business has a website, but it can still improve its online presence.";
-
-    const contactProblem = selectedLead.email
-      ? "The business has an email available, so email outreach is possible."
-      : selectedLead.instagram
-      ? "No public email was found, but Instagram and phone outreach are possible."
-      : "No public email or Instagram was found, so phone outreach may be the best option.";
-
-    const addressInfo = selectedLead.address
-      ? `Address: ${selectedLead.address}`
-      : "Address: Not found";
-
-    const websiteInfo = selectedLead.websiteUrl
-      ? `Website URL: ${selectedLead.websiteUrl}`
-      : "Website URL: Not found";
-
-    const googleMapsInfo = selectedLead.googleMapsUrl
-      ? `Google Maps: ${selectedLead.googleMapsUrl}`
-      : "Google Maps: Not found";
-
-    const audit = `Digital Presence Audit for ${selectedLead.name}
-
-Business Type: ${selectedLead.category}
-Location: ${selectedLead.city}
-${addressInfo}
-${websiteInfo}
-${googleMapsInfo}
-Rating: ${selectedLead.rating} stars
-Reviews: ${selectedLead.reviews}
-Opportunity Score: ${selectedLead.opportunityScore}%
-Lead Quality: ${getLeadQuality(selectedLead).emoji} ${getLeadQuality(selectedLead).label} (${getLeadQuality(selectedLead).score}/100)
-Follow-up: ${selectedLead.followUpDate || "Not scheduled"}
-
-Main Problems Found:
-1. ${websiteProblem}
-2. ${contactProblem}
-3. The business may be missing a stronger online sales system.
-4. There is an opportunity to improve trust, booking, and local visibility.
-5. The business could convert more visitors with a better call-to-action.
-
-Recommended Improvements:
-1. Create a modern professional website.
-2. Add a clear call-to-action such as "Book Now", "Call Now", or "Get a Quote".
-3. Add services, prices, location, photos, and customer reviews.
-4. Add a contact form connected to email.
-5. Improve local SEO for customers searching in ${selectedLead.city}.
-6. Add simple automation for follow-ups, appointments, or quotes.
-
-MADEVHUB Opportunity:
-This business could benefit from a professional landing page, mobile-friendly design, local SEO setup, and simple automation to help convert visitors into customers.
-
-Suggested Offer:
-Website Setup: $299 - $799
-Monthly Maintenance: $49 - $149/month
-Optional SEO / Automation: $99 - $299/month
-
-Next Step:
-Send a personalized message offering a free digital audit and a quick website improvement idea.`;
+    const audit = buildAudit(
+      selectedLead,
+      leadLanguage,
+      getLeadQuality(selectedLead)
+    );
 
     setGeneratedAudit(audit);
     addActivityLog(selectedLead.name, "Digital audit generated", "audit");
@@ -1588,28 +1532,29 @@ ${generatedAudit}`;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
-    doc.text("MADEVHUB AI Growth Engine", margin, y);
+    doc.text(OFFER.agency, margin, y);
 
     y += 8;
     doc.setFontSize(13);
-    doc.text("Digital Presence Audit", margin, y);
+    doc.text(
+      leadLanguage === "es"
+        ? "Auditoría de presencia digital"
+        : "Digital Presence Audit",
+      margin,
+      y
+    );
 
     y += 10;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text(`Business: ${selectedLead.name}`, margin, y);
+    doc.text(selectedLead.name, margin, y);
 
     y += 6;
-    doc.text(`Location: ${selectedLead.city}`, margin, y);
-
-    y += 6;
-    doc.text(`Category: ${selectedLead.category}`, margin, y);
-
-    y += 6;
-    doc.text(`Opportunity Score: ${selectedLead.opportunityScore}%`, margin, y);
-
-    y += 6;
-    doc.text(`Generated: ${new Date().toLocaleString()}`, margin, y);
+    doc.text(
+      `${leadLanguage === "es" ? "Fecha" : "Date"}: ${new Date().toLocaleDateString()}`,
+      margin,
+      y
+    );
 
     y += 10;
     doc.setDrawColor(220, 220, 220);
@@ -1647,7 +1592,6 @@ ${generatedAudit}`;
     }
 
     const fileName = `${createSafeFileName(selectedLead.name)}-proposal.pdf`;
-    const leadQuality = getLeadQuality(selectedLead);
     let JsPdf;
 
     try {
@@ -1716,22 +1660,8 @@ ${generatedAudit}`;
       });
     };
 
-    const websiteProblem =
-      selectedLead.website === "No Website"
-        ? "This business does not appear to have a professional website."
-        : selectedLead.website === "Old Website"
-        ? "This business may have an outdated website that can be improved."
-        : selectedLead.website === "Facebook Only"
-        ? "This business appears to depend mostly on Facebook instead of a dedicated website."
-        : "This business has a website, but it can still improve conversion, trust, and local visibility.";
-
-    const contactInfo = selectedLead.email
-      ? `Email available: ${selectedLead.email}`
-      : selectedLead.instagram
-      ? `No public email found, but Instagram is available: ${selectedLead.instagram}`
-      : selectedLead.phone
-      ? `No email or Instagram found, but phone outreach is available: ${selectedLead.phone}`
-      : "No strong contact channel was found yet.";
+    const content = buildProposalContent(selectedLead, leadLanguage);
+    const accent = [108, 92, 231];
 
     doc.setFillColor(8, 15, 35);
     doc.rect(0, 0, pageWidth, 42, "F");
@@ -1739,14 +1669,18 @@ ${generatedAudit}`;
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(20);
-    doc.text("MADEVHUB", margin, 18);
+    doc.text(OFFER.agency, margin, 18);
 
     doc.setFontSize(12);
-    doc.text("Digital Growth Proposal", margin, 28);
+    doc.text(content.header, margin, 28);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 36);
+    doc.text(
+      `${content.generated}: ${new Date().toLocaleDateString()}`,
+      margin,
+      36
+    );
 
     y = 54;
 
@@ -1760,95 +1694,41 @@ ${generatedAudit}`;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(71, 85, 105);
-    doc.text(`Category: ${selectedLead.category}`, margin, y);
+    doc.text(`${content.labels.category}: ${selectedLead.category}`, margin, y);
     y += 6;
-    doc.text(`Location: ${selectedLead.city}`, margin, y);
+    doc.text(`${content.labels.location}: ${selectedLead.city}`, margin, y);
     y += 6;
-    doc.text(`Opportunity Score: ${selectedLead.opportunityScore}%`, margin, y);
+    doc.text(`${content.labels.rating}: ${content.labels.ratingValue}`, margin, y);
     y += 6;
-    doc.text(`Lead Quality: ${leadQuality.emoji} ${leadQuality.label} (${leadQuality.score}/100)`, margin, y);
-    y += 6;
-    doc.text(`Website Status: ${selectedLead.website}`, margin, y);
-    y += 6;
-    doc.text(`Follow-up: ${selectedLead.followUpDate || "Not scheduled"}`, margin, y);
-    y += 6;
-    doc.text(`Rating: ${selectedLead.rating} stars / ${selectedLead.reviews} reviews`, margin, y);
+    doc.text(`${content.labels.website}: ${content.labels.websiteValue}`, margin, y);
     y += 8;
 
     doc.setDrawColor(220, 226, 235);
     doc.line(margin, y, pageWidth - margin, y);
 
-    addSectionTitle("1. Current Digital Situation");
-    addBullet(websiteProblem);
-    addBullet(contactInfo);
-    addBullet(
-      selectedLead.websiteUrl
-        ? `Website reviewed: ${selectedLead.websiteUrl}`
-        : "Website URL was not found."
-    );
-    addBullet(
-      selectedLead.googleMapsUrl
-        ? `Google Maps profile available: ${selectedLead.googleMapsUrl}`
-        : "Google Maps profile link was not found."
-    );
+    content.sections.forEach((section) => {
+      addSectionTitle(section.title);
+      section.bullets.forEach(addBullet);
+    });
 
-    addSectionTitle("2. Main Problems Found");
-    addBullet("The business may be losing customers because visitors do not see a clear and modern conversion path.");
-    addBullet("The website or online presence can be improved with stronger trust signals, service details, calls-to-action, and contact options.");
-    addBullet("Local SEO can be improved so more customers find the business when searching nearby.");
-    addBullet("There is an opportunity to add follow-up automation for quotes, appointments, or service requests.");
+    addSectionTitle(content.packageTitle);
+    content.packageFeatures.forEach(addBullet);
 
-    addSectionTitle("3. Recommended MADEVHUB Solution");
-    addBullet("Create or improve a premium mobile-friendly website or landing page.");
-    addBullet("Add a clear call-to-action such as Book Now, Call Now, Request a Quote, or Schedule Consultation.");
-    addBullet("Add services, location, testimonials, photos, contact forms, and Google Maps integration.");
-    addBullet("Set up a simple lead capture and follow-up system to help convert visitors into customers.");
-    addBullet(`Improve local SEO around ${selectedLead.city} and the selected business category: ${selectedLead.category}.`);
+    y += 2;
+    addNewPageIfNeeded(20);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...accent);
+    doc.text(content.careTitle, margin, y);
+    y += 6;
+    content.careFeatures.forEach(addBullet);
 
-    addSectionTitle("4. Suggested Packages");
+    addSectionTitle(content.nextTitle);
+    addTextBlock(content.nextText);
+
+    addSectionTitle(content.preparedBy);
     addTextBlock(
-      `Starter Website Package: $499
-- Premium landing page
-- Mobile responsive design
-- Contact form
-- Basic local SEO setup
-
-Growth Website + SEO Package: $899
-- Multi-section business website
-- Services and trust sections
-- Google Maps integration
-- Local SEO improvement
-- Lead capture optimization
-
-Premium Website + Automation Package: $1,499
-- Premium website
-- Lead capture funnel
-- Basic automation / follow-up flow
-- Conversion-focused copy
-- SEO and analytics setup
-
-Monthly Maintenance: $99/month
-- Basic updates
-- Monitoring
-- Small changes
-- Support`,
-      10,
-      6
-    );
-
-    addSectionTitle("5. Next Step");
-    addTextBlock(
-      `Send this business a short personalized message offering a free digital audit and one clear improvement idea. The goal is to start a conversation, not sell everything in the first message.
-
-Suggested opening:
-"Hi ${selectedLead.name}, I found your business online and prepared a quick digital growth idea that could help improve your website conversions and local visibility. Would you like me to send it over?"`
-    );
-
-    addSectionTitle("Prepared by");
-    addTextBlock(
-      `Juan Masis
-MADEVHUB
-Websites • Local SEO • Automation • Digital Growth`
+      `${OFFER.owner}\n${OFFER.agency} · ${OFFER.website.replace("https://", "")}\n${content.tagline}`
     );
 
     doc.save(fileName);
@@ -1864,116 +1744,119 @@ Websites • Local SEO • Automation • Digital Growth`
     if (!selectedLead) return;
 
     const leadQuality = getLeadQuality(selectedLead);
-    const businessName = selectedLead.name;
-    const cityName = selectedLead.city || "your area";
-    const businessCategory = selectedLead.category || "business";
-    const ratingText = selectedLead.rating
-      ? `${selectedLead.rating} stars`
-      : "strong local presence";
-    const reviewsText = selectedLead.reviews
-      ? `${selectedLead.reviews} reviews`
-      : "customer reviews";
-
-    const websiteObservation =
-      selectedLead.website === "No Website"
-        ? "I noticed your business may not have a professional website yet."
-        : selectedLead.website === "Old Website"
-        ? "I noticed your website may be due for a more modern and conversion-focused upgrade."
-        : selectedLead.website === "Facebook Only"
-        ? "I noticed your business may be relying heavily on Facebook instead of a dedicated website."
-        : "I noticed there may be room to improve your website conversion and local visibility.";
-
-    const messages = {
-      email: {
-        title: "Initial Email",
-        body: `Subject: Quick digital growth idea for ${businessName}
-
-Hi ${businessName},
-
-I found your business online while looking at ${businessCategory} businesses in ${cityName}. You already have a strong reputation with ${ratingText} and ${reviewsText}.
-
-${websiteObservation}
-
-At MADEVHUB, we help local businesses improve their website, local SEO, and lead capture so more visitors become real customers.
-
-I prepared a quick digital growth idea for your business.
-
-Would you like me to send it over?
-
-Best,
-Juan
-MADEVHUB`,
-      },
-
-      instagram: {
-        title: "Instagram DM",
-        body: `Hi ${businessName}, I found your business online and noticed you have a strong local presence in ${cityName}.
-
-${websiteObservation}
-
-I help local businesses get better websites, stronger local visibility, and more customer inquiries online.
-
-I prepared a quick digital growth idea for your business. Would you like me to send it over?`,
-      },
-
-      followup1: {
-        title: "Follow-up 1",
-        body: `Hi ${businessName},
-
-Just wanted to follow up on my previous message.
-
-I noticed a few simple improvements that could help your online presence convert more visitors into customers, especially for people searching for ${businessCategory} services in ${cityName}.
-
-I can send you the quick audit idea if you would like to see it.
-
-Best,
-Juan
-MADEVHUB`,
-      },
-
-      followup2: {
-        title: "Follow-up 2",
-        body: `Hi ${businessName},
-
-Last quick follow-up from me.
-
-I know you are probably busy, so I will keep it simple: I found a few opportunities to improve trust, visibility, and lead capture for your business online.
-
-No pressure — I can send the quick idea over if it is useful.
-
-Best,
-Juan
-MADEVHUB`,
-      },
-
-      call: {
-        title: "Call Script",
-        body: `Call Script for ${businessName}
-
-Hi, my name is Juan from MADEVHUB.
-
-I found your business online and noticed you have a strong reputation with ${ratingText} and ${reviewsText}.
-
-The reason for my call is that I help local businesses improve their website, local visibility, and lead capture system.
-
-I noticed one quick opportunity: ${websiteObservation}
-
-I wanted to ask: do you currently have someone helping you with your website or online marketing?
-
-If not, I can send you a free quick digital audit with a few improvement ideas.`,
-      },
-    };
-
-    const selectedMessage = messages[type];
+    const selectedMessage = buildOutreachMessage(
+      selectedLead,
+      type,
+      leadLanguage
+    );
 
     setOutreachTitle(selectedMessage.title);
     setOutreachMessage(selectedMessage.body);
+    setOutreachChannel(selectedMessage.channel);
 
     addActivityLog(
-      businessName,
+      selectedLead.name,
       `${selectedMessage.title} generated. Lead quality: ${leadQuality.label}`,
       "outreach"
     );
+  };
+
+  const leadWhatsappNumber = getWhatsappNumber(selectedLead);
+
+  const openWhatsapp = (text) => {
+    if (!selectedLead) return false;
+
+    if (!leadWhatsappNumber) {
+      notify("This business has no phone or WhatsApp number.", "error");
+      return false;
+    }
+
+    window.open(buildWhatsappUrl(leadWhatsappNumber, text), "_blank", "noopener");
+    return true;
+  };
+
+  const sendOutreachOnWhatsapp = () => {
+    if (!outreachMessage) return;
+    if (!openWhatsapp(outreachMessage)) return;
+
+    addActivityLog(
+      selectedLead.name,
+      `${outreachTitle} opened in WhatsApp`,
+      "whatsapp"
+    );
+  };
+
+  // ---------- Página demo ----------
+
+  const demoFileName = selectedLead
+    ? `${createSafeFileName(selectedLead.name)}-demo.html`
+    : "demo.html";
+
+  const generateDemoSite = () => {
+    if (!selectedLead) return;
+
+    setDemoHtml(buildDemoSiteHtml(selectedLead, leadLanguage));
+    updateSelectedLeadData({ demoCreatedDate: new Date().toLocaleDateString() });
+    addActivityLog(selectedLead.name, "Demo website generated", "demo");
+    notify("Demo website ready. Preview it below.", "success");
+  };
+
+  const downloadDemoSite = () => {
+    if (!demoHtml) return;
+
+    const blob = new Blob([demoHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+
+    downloadLink.href = url;
+    downloadLink.download = demoFileName;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(url);
+
+    addActivityLog(selectedLead.name, `Demo downloaded as ${demoFileName}`, "demo");
+  };
+
+  const openDemoInNewTab = () => {
+    if (!demoHtml) return;
+
+    const blob = new Blob([demoHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener");
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  };
+
+  const demoShareMessage = selectedLead
+    ? buildDemoShareMessage(selectedLead, leadLanguage, selectedLead.demoUrl || "")
+    : "";
+
+  const saveDemoUrl = (demoUrl) => {
+    updateSelectedLeadData({ demoUrl: demoUrl.trim() });
+  };
+
+  const copyDemoShareMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(demoShareMessage);
+      notify("Demo message copied!", "success");
+    } catch {
+      notify("Could not copy the message.");
+    }
+  };
+
+  const sendDemoOnWhatsapp = () => {
+    if (!selectedLead.demoUrl) {
+      notify("Add the demo link first, so the client can open it.", "error");
+      return;
+    }
+
+    if (!openWhatsapp(demoShareMessage)) return;
+
+    if (selectedLead.status === "New") {
+      updateLeadStatus(selectedLead.id, "Contacted");
+    }
+
+    addActivityLog(selectedLead.name, "Demo sent on WhatsApp", "whatsapp");
   };
 
   const copyOutreachMessage = async () => {
@@ -2105,6 +1988,17 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
   const handleSendAction = async () => {
     if (!selectedLead) return;
 
+    if (contactMode === "whatsapp") {
+      if (!openWhatsapp(contactMessage)) return;
+      updateLeadStatus(selectedLead.id, "Contacted");
+      addActivityLog(
+        selectedLead.name,
+        `WhatsApp opened for +${leadWhatsappNumber}`,
+        "whatsapp"
+      );
+      return;
+    }
+
     if (contactMode === "email" && !selectedLead.email) {
       notify("This business does not have an email.");
       return;
@@ -2136,7 +2030,10 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
     addActivityLog(selectedLead.name, action, contactMode);
 
     if (contactMode === "email") {
-      const subject = encodeURIComponent(`Quick idea for ${selectedLead.name}`);
+      const subjectLine = contactMessage.match(/^Subject: (.*)/);
+      const subject = encodeURIComponent(
+        subjectLine ? subjectLine[1] : selectedLead.name
+      );
       const body = encodeURIComponent(
         contactMessage.replace(/^Subject:.*\n\n/, "")
       );
@@ -2225,6 +2122,18 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
           </label>
 
           <label>
+            Message Language
+            <select
+              name="language"
+              value={leadForm.language}
+              onChange={handleLeadFormChange}
+            >
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+
+          <label>
             Phone
             <input
               type="text"
@@ -2308,6 +2217,118 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
           </button>
         </div>
       </form>
+    </div>
+  ) : null;
+
+  const languageToggle = selectedLead ? (
+    <div className="lang-toggle" role="group" aria-label="Message language">
+      {LANGUAGES.map((language) => (
+        <button
+          key={language.id}
+          type="button"
+          className={leadLanguage === language.id ? "active" : ""}
+          onClick={() => setLeadLanguage(language.id)}
+        >
+          {language.label}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
+  const demoCard = selectedLead ? (
+    <div className="card" id="demo">
+      <div className="card-header">
+        <div>
+          <h3>Demo Website</h3>
+          <p className="muted">
+            A sample website for {selectedLead.name} built from its real Google
+            data. Send it as the hook: "I already made you a preview."
+          </p>
+        </div>
+      </div>
+
+      <div className="demo-actions">
+        <button className="primary-btn" onClick={generateDemoSite}>
+          <Sparkles size={16} />
+          {demoHtml ? "Regenerate Demo" : "Create Demo Website"}
+        </button>
+        <button
+          className="secondary-btn"
+          onClick={openDemoInNewTab}
+          disabled={!demoHtml}
+        >
+          <ExternalLink size={16} />
+          Open Full Screen
+        </button>
+        <button
+          className="secondary-btn"
+          onClick={downloadDemoSite}
+          disabled={!demoHtml}
+        >
+          <Download size={16} />
+          Download HTML
+        </button>
+      </div>
+
+      {demoHtml ? (
+        <>
+          <div className="demo-preview">
+            <iframe
+              title={`Demo website for ${selectedLead.name}`}
+              srcDoc={demoHtml}
+              sandbox="allow-popups allow-popups-to-escape-sandbox"
+            />
+          </div>
+
+          <div className="demo-share">
+            <h4>Send it to the client</h4>
+            <ol className="demo-steps">
+              <li>
+                Download the HTML and drag it to{" "}
+                <a href="https://app.netlify.com/drop" target="_blank" rel="noreferrer">
+                  Netlify Drop
+                </a>{" "}
+                (free, 30 seconds) to get a public link.
+              </li>
+              <li>Paste the link here.</li>
+              <li>Send it on WhatsApp with the ready message.</li>
+            </ol>
+
+            <label className="demo-url">
+              Demo link
+              <input
+                type="url"
+                placeholder="https://your-demo.netlify.app"
+                value={selectedLead.demoUrl || ""}
+                onChange={(event) => saveDemoUrl(event.target.value)}
+              />
+            </label>
+
+            <p className="message-box">{demoShareMessage}</p>
+
+            <div className="actions">
+              <button className="secondary-btn" onClick={copyDemoShareMessage}>
+                <Copy size={16} />
+                Copy Message
+              </button>
+              <button
+                className="primary-btn"
+                onClick={sendDemoOnWhatsapp}
+                disabled={!leadWhatsappNumber}
+              >
+                <MessageCircle size={16} />
+                Send on WhatsApp
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="empty-state">
+          {selectedLead.demoCreatedDate
+            ? `Demo created on ${selectedLead.demoCreatedDate}. Click "Create Demo Website" to rebuild the preview.`
+            : `Uses the business name, city, phone, rating, reviews and address. Package price shown in messages: ${formatPrice(OFFER.packagePrice)}.`}
+        </div>
+      )}
     </div>
   ) : null;
 
@@ -2842,9 +2863,15 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
         {activeView === "audits" && (
           <section className="view-grid single">
             {selectedLead ? (
+              <>
               <div className="card" id="audits">
-                <h3>AI Audit Preview</h3>
-                <p className="muted">{selectedLead.name}</p>
+                <div className="card-header">
+                  <div>
+                    <h3>AI Audit Preview</h3>
+                    <p className="muted">{selectedLead.name}</p>
+                  </div>
+                  {languageToggle}
+                </div>
 
                 <div className="score-circle">
                   {selectedLead.opportunityScore}%
@@ -3006,6 +3033,9 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                   </div>
                 )}
               </div>
+
+              {demoCard}
+              </>
             ) : (
               noLeadState
             )}
@@ -3018,12 +3048,26 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
             {selectedLead ? (
               <>
                 <div className="card">
-                  <h3>Contact Actions</h3>
-                  <p className="muted">
-                    Choose the best way to contact {selectedLead.name}.
-                  </p>
+                  <div className="card-header">
+                    <div>
+                      <h3>Contact Actions</h3>
+                      <p className="muted">
+                        Choose the best way to contact {selectedLead.name}.
+                      </p>
+                    </div>
+                    {languageToggle}
+                  </div>
 
                   <div className="contact-actions">
+                    <button
+                      className={contactMode === "whatsapp" ? "active" : ""}
+                      disabled={!leadWhatsappNumber}
+                      onClick={() => setContactMode("whatsapp")}
+                    >
+                      <MessageCircle size={16} />
+                      WhatsApp
+                    </button>
+
                     <button
                       className={contactMode === "email" ? "active" : ""}
                       disabled={!selectedLead.email}
@@ -3038,7 +3082,7 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                       disabled={!selectedLead.instagram}
                       onClick={() => setContactMode("instagram")}
                     >
-                      <MessageCircle size={16} />
+                      <Globe size={16} />
                       Instagram
                     </button>
 
@@ -3054,6 +3098,9 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
 
                   <div className="contact-info">
                     <strong>Selected channel:</strong> {contactMode}
+                    {contactMode === "whatsapp" && leadWhatsappNumber
+                      ? ` · +${leadWhatsappNumber}`
+                      : ""}
                   </div>
                 </div>
 
@@ -3079,8 +3126,8 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                     <div>
                       <h3>Outreach Sequence</h3>
                       <p className="muted">
-                        Five ready-to-send steps for {selectedLead.name}. Pick
-                        one, copy it, and mark the lead as contacted.
+                        Six ready-to-send steps for {selectedLead.name}. Pick
+                        one, send it, and mark the lead as contacted.
                       </p>
                     </div>
                   </div>
@@ -3091,13 +3138,14 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                         key={step.id}
                         type="button"
                         className={
-                          outreachTitle === step.label
+                          outreachTitle ===
+                          getOutreachStepLabel(step.id, leadLanguage)
                             ? "primary-btn"
                             : "secondary-btn"
                         }
                         onClick={() => generateOutreachSequence(step.id)}
                       >
-                        {step.label}
+                        {step[leadLanguage]}
                       </button>
                     ))}
                   </div>
@@ -3122,6 +3170,17 @@ If not, I can send you a free quick digital audit with a few improvement ideas.`
                           <Copy size={16} />
                           Copy Message
                         </button>
+
+                        {outreachChannel === "whatsapp" && (
+                          <button
+                            className="secondary-btn"
+                            onClick={sendOutreachOnWhatsapp}
+                            disabled={!leadWhatsappNumber}
+                          >
+                            <MessageCircle size={16} />
+                            Open in WhatsApp
+                          </button>
+                        )}
 
                         <button
                           className="primary-btn"
